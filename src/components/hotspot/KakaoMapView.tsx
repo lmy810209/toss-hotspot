@@ -21,23 +21,24 @@ const LEVEL_COLOR: Record<number, string> = { 1: "#22c55e", 2: "#f59e0b", 3: "#e
 const LEVEL_TEXT: Record<number, string>  = { 1: "여유", 2: "보통", 3: "붐빔" };
 
 function makeMarkerEl(hotspot: Hotspot, isSelected: boolean): HTMLElement {
-  const color = LEVEL_COLOR[hotspot.congestion_level];
-  const label = LEVEL_TEXT[hotspot.congestion_level];
-  const scale = isSelected ? 1.12 : 1;
-  const ring  = isSelected ? "box-shadow:0 0 0 3px #3182F6;" : "";
+  const color  = LEVEL_COLOR[hotspot.congestion_level];
+  const label  = LEVEL_TEXT[hotspot.congestion_level];
+  const scale  = isSelected ? 1.15 : 1;
+  const glow   = isSelected ? `drop-shadow(0 0 6px ${color})` : "";
+  const ring   = isSelected ? `outline:3px solid #3182F6;outline-offset:2px;` : "";
 
   const tossBadge = hotspot.is_toss_place
-    ? `<div style="display:flex;align-items:center;gap:2px;background:#3182F6;color:#fff;font-size:9px;font-weight:900;padding:2px 6px;border-radius:99px;margin-bottom:2px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);">💳 토스 단말기</div>`
+    ? `<div style="display:flex;align-items:center;gap:3px;background:linear-gradient(135deg,#3182F6,#1c6ef3);color:#fff;font-size:10px;font-weight:900;padding:3px 8px;border-radius:99px;margin-bottom:3px;white-space:nowrap;box-shadow:0 2px 8px rgba(49,130,246,0.45);letter-spacing:-0.2px;">💳 토스 단말기</div>`
     : "";
 
   const html =
-    `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:scale(${scale});transition:transform 0.15s;">` +
+    `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:scale(${scale});transition:transform 0.18s;filter:${glow};">` +
     tossBadge +
-    `<div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:99px;margin-bottom:4px;box-shadow:0 2px 6px rgba(0,0,0,0.18);white-space:nowrap;">${label}</div>` +
-    `<div style="background:#fff;border-radius:50%;padding:6px;${ring}box-shadow:0 2px 8px rgba(0,0,0,0.18);">` +
-      `<svg width="20" height="20" viewBox="0 0 24 24" fill="${color}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>` +
+    `<div style="background:${color};color:#fff;font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;margin-bottom:5px;box-shadow:0 3px 10px ${color}88;white-space:nowrap;letter-spacing:-0.3px;">${label}</div>` +
+    `<div style="background:#fff;border-radius:50%;padding:7px;${ring}box-shadow:0 4px 14px rgba(0,0,0,0.22);">` +
+      `<svg width="24" height="24" viewBox="0 0 24 24" fill="${color}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>` +
     `</div>` +
-    `<span style="margin-top:3px;font-size:11px;font-weight:600;color:#1a1a1a;background:rgba(255,255,255,0.92);padding:1px 6px;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.1);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;">${hotspot.name}</span>` +
+    `<span style="margin-top:4px;font-size:12px;font-weight:700;color:#111;background:rgba(255,255,255,0.96);padding:2px 8px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.14);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${hotspot.name}</span>` +
     `</div>`;
 
   const wrap = document.createElement("div");
@@ -170,15 +171,34 @@ export default function KakaoMapView({
     syncUserOverlay(userLocation);
   }, [status, hotspots, selectedHotspot, userLocation]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  function zoomIn()  { if (mapRef.current) mapRef.current.setLevel(mapRef.current.getLevel() - 1); }
+  function zoomOut() { if (mapRef.current) mapRef.current.setLevel(mapRef.current.getLevel() + 1); }
+
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* 그레이스케일 지도 타일 */}
+      {/* 지도 타일 — 약한 필터로 POI·건물 선명하게 유지 */}
       <div
         className="absolute inset-0"
-        style={{ filter: "grayscale(100%) brightness(108%) contrast(0.88) sepia(5%)" }}
+        style={{ filter: "saturate(0.75) brightness(1.04) contrast(1.08)" }}
       >
         <div ref={mapDivRef} style={{ width: "100%", height: "100%" }} />
       </div>
+
+      {/* 줌 컨트롤 */}
+      {status === "ready" && (
+        <div className="absolute right-4 bottom-24 z-20 flex flex-col rounded-xl overflow-hidden shadow-lg border border-gray-200">
+          <button
+            onClick={zoomIn}
+            className="w-10 h-10 bg-white flex items-center justify-center text-xl font-light text-gray-700 hover:bg-gray-50 active:bg-gray-100 border-b border-gray-200"
+            aria-label="확대"
+          >+</button>
+          <button
+            onClick={zoomOut}
+            className="w-10 h-10 bg-white flex items-center justify-center text-xl font-light text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+            aria-label="축소"
+          >−</button>
+        </div>
+      )}
 
       {/* 로딩 */}
       {status === "loading" && (
