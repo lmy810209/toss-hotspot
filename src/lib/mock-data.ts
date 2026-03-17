@@ -12,7 +12,8 @@ export const MOCK_HOTSPOTS: Hotspot[] = [
     congestion_level: 3,
     last_updated: new Date(),
     report_count: 154,
-    description: "지금 가장 핫한 벚꽃 명소예요."
+    description: "지금 가장 핫한 벚꽃 명소예요.",
+    is_toss_place: true,
   },
   {
     id: "2",
@@ -23,7 +24,8 @@ export const MOCK_HOTSPOTS: Hotspot[] = [
     congestion_level: 2,
     last_updated: new Date(),
     report_count: 89,
-    description: "트렌디한 카페가 가득해요."
+    description: "트렌디한 카페가 가득해요.",
+    is_toss_place: true,
   },
   {
     id: "3",
@@ -34,7 +36,8 @@ export const MOCK_HOTSPOTS: Hotspot[] = [
     congestion_level: 1,
     last_updated: new Date(),
     report_count: 42,
-    description: "산책로를 따라 벚꽃이 예뻐요."
+    description: "산책로를 따라 벚꽃이 예뻐요.",
+    is_toss_place: false,
   },
   {
     id: "4",
@@ -45,7 +48,8 @@ export const MOCK_HOTSPOTS: Hotspot[] = [
     congestion_level: 3,
     last_updated: new Date(),
     report_count: 320,
-    description: "주말에는 매우 붐벼요."
+    description: "주말에는 매우 붐벼요.",
+    is_toss_place: true,
   },
   {
     id: "5",
@@ -56,7 +60,8 @@ export const MOCK_HOTSPOTS: Hotspot[] = [
     congestion_level: 2,
     last_updated: new Date(),
     report_count: 112,
-    description: "맛있는 먹거리가 많아요."
+    description: "맛있는 먹거리가 많아요.",
+    is_toss_place: false,
   },
   {
     id: "6",
@@ -67,6 +72,7 @@ export const MOCK_HOTSPOTS: Hotspot[] = [
     congestion_level: 1,
     last_updated: new Date(),
     report_count: 67,
-    description: "여유로운 산책이 가능해요."
-  }
+    description: "여유로운 산책이 가능해요.",
+    is_toss_place: false,
+  },
 ];

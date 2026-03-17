@@ -4,51 +4,65 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* TDS (Toss Design System) — Light */
+    --background: 220 20% 97%;        /* #F9FAFB - TDS app bg */
+    --foreground: 215 25% 12%;        /* #191F28 - TDS text primary */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 215 25% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 215 92% 58%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 185 40% 92%;
-    --secondary-foreground: 215 92% 30%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215 16% 47%;
+    --popover-foreground: 215 25% 12%;
+    --primary: 215 92% 58%;           /* #3182F6 - Toss Blue */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 20% 95%;         /* #EBF0FB - Toss Blue light bg */
+    --secondary-foreground: 215 92% 40%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;  /* #6B7280 - TDS text secondary */
     --accent: 215 92% 58%;
-    --accent-foreground: 210 40% 98%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;            /* #E5E7EB - TDS border */
+    --input: 220 13% 91%;
     --ring: 215 92% 58%;
     --radius: 0.75rem;
-    --chart-1: 142 76% 36%; /* 여유 (Green) */
-    --chart-2: 48 96% 53%;  /* 보통 (Yellow) */
-    --chart-3: 0 84% 60%;   /* 붐빔 (Red) */
+    /* Congestion colors */
+    --chart-1: 142 76% 36%;           /* 여유 (Green) */
+    --chart-2: 48 96% 53%;            /* 보통 (Yellow/Amber) */
+    --chart-3: 0 84% 60%;             /* 붐빔 (Red) */
+    /* TDS semantic tokens */
+    --toss-blue: 215 92% 58%;
+    --toss-blue-light: 215 92% 95%;
+    --toss-success: 142 76% 36%;
+    --toss-warning: 32 95% 52%;
+    --toss-danger: 0 84% 60%;
+    --toss-gray-50: 220 20% 97%;
+    --toss-gray-100: 220 14% 94%;
+    --toss-gray-200: 220 13% 91%;
+    --toss-gray-400: 215 16% 47%;
+    --toss-gray-700: 215 25% 27%;
+    --toss-gray-900: 215 25% 12%;
   }
 
   .dark {
-    --background: 222 47% 11%;
+    --background: 215 28% 9%;
     --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
+    --card: 215 25% 12%;
     --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
+    --popover: 215 25% 12%;
     --popover-foreground: 210 40% 98%;
     --primary: 215 92% 58%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 25% 18%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 215 25% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 215 25% 18%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --border: 215 25% 18%;
+    --input: 215 25% 18%;
+    --ring: 215 92% 58%;
   }
 }
 
@@ -72,4 +86,47 @@
 
 .toss-card-shadow {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* ───── 토스 포인트 코인 애니메이션 ───── */
+@keyframes coin-launch {
+  0%   { transform: translate(-50%, 0)       scale(0.3) rotate(-20deg); opacity: 0; }
+  12%  { transform: translate(-50%, -24px)   scale(1.3) rotate(10deg);  opacity: 1; }
+  55%  { transform: translate(-50%, -130px)  scale(1.1) rotate(-5deg);  opacity: 1; }
+  100% { transform: translate(-50%, -220px)  scale(0.7) rotate(15deg);  opacity: 0; }
+}
+@keyframes coin-glow {
+  0%, 100% { filter: drop-shadow(0 0 0px #FFD700); }
+  50%       { filter: drop-shadow(0 0 14px #FFD700) drop-shadow(0 0 28px #FFA500); }
+}
+@keyframes sparkle-burst {
+  0%   { transform: translate(0, 0)           scale(0) rotate(0deg);   opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(1) rotate(180deg); opacity: 0; }
+}
+@keyframes point-text-rise {
+  0%   { transform: translate(-50%, 0)      scale(0.7); opacity: 0; }
+  18%  { transform: translate(-50%, -10px)  scale(1.1); opacity: 1; }
+  70%  { transform: translate(-50%, -40px)  scale(1);   opacity: 1; }
+  100% { transform: translate(-50%, -70px)  scale(0.9); opacity: 0; }
+}
+@keyframes ring-expand {
+  0%   { transform: translate(-50%, -50%) scale(0); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(3); opacity: 0;   }
+}
+
+/* Bottom sheet slide-up animation */
+@keyframes slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes slide-down {
+  from { transform: translateY(0);    opacity: 1; }
+  to   { transform: translateY(100%); opacity: 0; }
+}
+.animate-slide-up {
+  animation: slide-up 0.32s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+.animate-slide-down {
+  animation: slide-down 0.28s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }

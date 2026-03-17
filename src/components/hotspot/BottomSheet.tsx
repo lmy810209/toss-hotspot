@@ -1,0 +1,330 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Hotspot, UserLocation } from "@/lib/types";
+import { calculateDistance } from "@/lib/toss-sdk";
+import { formatDistanceToNow } from "date-fns";
+import { ko } from "date-fns/locale";
+import {
+  MapPin,
+  Users,
+  Clock,
+  AlertCircle,
+  X,
+  Coins,
+  Share2,
+  Eye,
+} from "lucide-react";
+import { useViewerCount } from "@/hooks/use-viewer-count";
+
+interface BottomSheetProps {
+  hotspot: Hotspot | null;
+  userLocation: UserLocation | null;
+  onClose: () => void;
+  onReport: (id: string, level: 1 | 2 | 3) => Promise<void>;
+}
+
+const CONGESTION_CONFIG = {
+  1: {
+    label: "여유로워요",
+    emoji: "😊",
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    dot: "bg-emerald-500",
+    bar: "bg-emerald-500",
+    barWidth: "w-1/3",
+  },
+  2: {
+    label: "보통이에요",
+    emoji: "😐",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    dot: "bg-amber-500",
+    bar: "bg-amber-500",
+    barWidth: "w-2/3",
+  },
+  3: {
+    label: "많이 붐벼요",
+    emoji: "😵",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    border: "border-red-200",
+    dot: "bg-red-500",
+    bar: "bg-red-500",
+    barWidth: "w-full",
+  },
+} as const;
+
+export default function BottomSheet({
+  hotspot,
+  userLocation,
+  onClose,
+  onReport,
+}: BottomSheetProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+  const [shareFeedback, setShareFeedback] = useState<"" | "copied" | "shared">("");
+  const sheetRef = useRef<HTMLDivElement>(null);
+
+  // 실시간 조회자 수
+  const viewerCount = useViewerCount(hotspot?.id ?? null);
+
+  useEffect(() => {
+    if (hotspot) setIsVisible(true);
+  }, [hotspot]);
+
+  const handleClose = () => {
+    setIsVisible(false);
+    setTimeout(onClose, 280);
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) handleClose();
+  };
+
+  // 100m 이내 여부
+  const distance =
+    userLocation && hotspot
+      ? calculateDistance(userLocation, { lat: hotspot.lat, lng: hotspot.lng })
+      : null;
+  const canReport = distance !== null && distance <= 100;
+
+  const handleReport = async (level: 1 | 2 | 3) => {
+    if (!hotspot || isReporting) return;
+    setIsReporting(true);
+    await onReport(hotspot.id, level);
+    setIsReporting(false);
+    handleClose();
+  };
+
+  /** 함께 토스 켜기 스타일 공유 */
+  const handleShare = async () => {
+    if (!hotspot) return;
+    const cfg = CONGESTION_CONFIG[hotspot.congestion_level];
+    const text = `${hotspot.name} 지금 ${cfg.label}! 나도 Toss Hotspot에서 확인해봐 👉`;
+    const url = typeof window !== "undefined" ? window.location.href : "";
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: `Toss Hotspot — ${hotspot.name}`, text, url });
+        setShareFeedback("shared");
+      } else {
+        await navigator.clipboard.writeText(`${text} ${url}`);
+        setShareFeedback("copied");
+      }
+    } catch {
+      // 공유 취소 등 — 무시
+    }
+    setTimeout(() => setShareFeedback(""), 2000);
+  };
+
+  if (!hotspot) return null;
+
+  const cfg = CONGESTION_CONFIG[hotspot.congestion_level];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center"
+      onClick={handleBackdropClick}
+    >
+      {/* Backdrop */}
+      <div
+        className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+      />
+
+      {/* Sheet */}
+      <div
+        ref={sheetRef}
+        className={`relative w-full max-w-lg bg-white rounded-t-[28px] ${
+          isVisible ? "animate-slide-up" : "animate-slide-down"
+        }`}
+        style={{ maxHeight: "92dvh", overflowY: "auto" }}
+      >
+        {/* Drag Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-toss-gray-200 rounded-full" />
+        </div>
+
+        {/* 닫기 */}
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-toss-gray-100 text-toss-gray-500 hover:bg-toss-gray-200 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="px-6 pt-2 pb-8 space-y-5">
+          {/* 헤더 */}
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="inline-block text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                {hotspot.category}
+              </span>
+              {hotspot.is_toss_place && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-primary px-2 py-0.5 rounded-full">
+                  💳 토스 단말기 매장
+                </span>
+              )}
+            </div>
+            <h2 className="text-2xl font-bold text-toss-gray-900 leading-tight">
+              {hotspot.name}
+            </h2>
+            {hotspot.description && (
+              <p className="text-sm text-toss-gray-500 mt-1 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 shrink-0" />
+                {hotspot.description}
+              </p>
+            )}
+          </div>
+
+          {/* ── 실시간 조회자 수 배너 ── */}
+          <div className="flex items-center gap-2.5 bg-toss-gray-50 border border-toss-gray-200 rounded-2xl px-4 py-3">
+            <Eye className="w-4 h-4 text-primary shrink-0" />
+            <span className="text-sm text-toss-gray-700">
+              지금{" "}
+              <span className="font-black text-primary">{viewerCount}명</span>
+              이 이 장소를 보고 있어요!
+            </span>
+            {/* 실시간 pulse 인디케이터 */}
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-red-500 font-bold">
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              LIVE
+            </span>
+          </div>
+
+          {/* 혼잡도 현황 카드 */}
+          <div className={`rounded-2xl p-4 ${cfg.bg} ${cfg.border} border`}>
+            <p className="text-xs font-semibold text-toss-gray-500 mb-1">현재 혼잡도</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{cfg.emoji}</span>
+                <span className={`text-xl font-bold ${cfg.color}`}>{cfg.label}</span>
+              </div>
+              <div className="w-1/3">
+                <div className="h-2 bg-white/60 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${cfg.bar} ${cfg.barWidth} transition-all duration-700`}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 통계 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-toss-gray-50 rounded-2xl p-4 flex flex-col items-center gap-1">
+              <Users className="w-4 h-4 text-primary" />
+              <span className="text-xs text-toss-gray-500">실시간 제보</span>
+              <span className="text-lg font-bold text-toss-gray-900">
+                {hotspot.report_count}명
+              </span>
+            </div>
+            <div className="bg-toss-gray-50 rounded-2xl p-4 flex flex-col items-center gap-1">
+              <Clock className="w-4 h-4 text-primary" />
+              <span className="text-xs text-toss-gray-500">마지막 업데이트</span>
+              <span className="text-sm font-bold text-toss-gray-900 text-center">
+                {formatDistanceToNow(hotspot.last_updated, {
+                  addSuffix: true,
+                  locale: ko,
+                })}
+              </span>
+            </div>
+          </div>
+
+          {/* 구분선 */}
+          <div className="h-px bg-toss-gray-100" />
+
+          {/* ── CTA 영역 ── */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 제보하고 10원 받기 */}
+            <div className="flex items-center gap-2 bg-primary/5 rounded-2xl px-3 py-3 border border-primary/10">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Coins className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-toss-gray-900">제보하고</p>
+                <p className="text-xs font-black text-primary">10원 받기</p>
+              </div>
+            </div>
+
+            {/* 친구에게 공유하고 10원 더 받기 */}
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 bg-toss-gray-50 hover:bg-toss-gray-100 active:scale-95 rounded-2xl px-3 py-3 border border-toss-gray-200 transition-all text-left"
+            >
+              <div className="w-8 h-8 rounded-full bg-toss-gray-200 flex items-center justify-center shrink-0">
+                <Share2 className="w-4 h-4 text-toss-gray-700" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-toss-gray-900">
+                  {shareFeedback === "copied"
+                    ? "링크 복사됨!"
+                    : shareFeedback === "shared"
+                    ? "공유 완료!"
+                    : "친구에게 공유"}
+                </p>
+                <p className="text-xs font-black text-toss-gray-500">+10원 더</p>
+              </div>
+            </button>
+          </div>
+
+          {/* 제보 버튼 */}
+          <div className="space-y-3">
+            <h3 className="font-bold text-toss-gray-900">지금 어때요?</h3>
+
+            {!canReport && distance !== null && (
+              <div className="flex items-start gap-2.5 bg-orange-50 border border-orange-100 rounded-2xl p-3.5 text-sm text-orange-700">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  100m 이내에 있어야 제보할 수 있어요.
+                  <br />
+                  <span className="font-semibold">현재 {Math.round(distance)}m</span> 떨어져 있어요.
+                </span>
+              </div>
+            )}
+
+            {distance === null && (
+              <div className="flex items-center gap-2 text-sm text-toss-gray-500 bg-toss-gray-50 rounded-2xl p-3.5">
+                <div className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                위치를 확인하는 중이에요...
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-2">
+              {([1, 2, 3] as const).map((level) => {
+                const c = CONGESTION_CONFIG[level];
+                return (
+                  <button
+                    key={level}
+                    disabled={!canReport || isReporting}
+                    onClick={() => handleReport(level)}
+                    className={`
+                      flex flex-col items-center gap-2 py-4 rounded-2xl border-2 font-semibold text-sm
+                      transition-all duration-200 active:scale-95
+                      ${
+                        canReport
+                          ? `${c.bg} ${c.border} ${c.color} hover:brightness-95 cursor-pointer`
+                          : "bg-toss-gray-50 border-toss-gray-200 text-toss-gray-400 cursor-not-allowed opacity-60"
+                      }
+                    `}
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${c.dot} ${
+                        !canReport ? "opacity-40" : ""
+                      }`}
+                    />
+                    {c.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

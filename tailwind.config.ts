@@ -15,6 +15,21 @@ export default {
         code: ['monospace'],
       },
       colors: {
+        /* TDS (Toss Design System) semantic palette */
+        toss: {
+          blue: '#3182F6',
+          'blue-light': '#EBF3FF',
+          success: '#22c55e',
+          warning: '#f59e0b',
+          danger: '#ef4444',
+          'gray-50': '#F9FAFB',
+          'gray-100': '#F3F4F6',
+          'gray-200': '#E5E7EB',
+          'gray-400': '#9CA3AF',
+          'gray-500': '#6B7280',
+          'gray-700': '#374151',
+          'gray-900': '#111827',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
