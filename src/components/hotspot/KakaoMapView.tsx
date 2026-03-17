@@ -99,7 +99,7 @@ export default function NaverMapView({
 
   // ── 카카오 지도 SDK 스크립트 로드 ────────────────────────
   useEffect(() => {
-    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY;
+    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY || "bd83824564c77b233b4ce3f5a2d6af6c";
     if (!appKey) {
       setErrorMsg("NEXT_PUBLIC_KAKAO_MAP_APP_KEY 환경변수가 없습니다.");
       setStatus("error");
