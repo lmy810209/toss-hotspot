@@ -1,13 +1,7 @@
 "use client";
 
 /**
- * NaverMapView — 네이버 지도 SDK 직접 로딩
- *
- * 핵심 구조: 지도 컨테이너 div는 항상 DOM에 존재.
- * 로딩/에러 상태는 그 위에 overlay로 표시.
- *
- * (이전 방식: status === "loading" 일 때 스피너만 렌더 →
- *  mapDivRef.current === null → initMap() 즉시 리턴 → 영원히 loading 상태)
+ * KakaoMapView — 카카오 지도 SDK 직접 로딩
  *
  * 2-레이어 구조:
  *  ┌─ container ──────────────────────────────────────────┐
@@ -23,7 +17,7 @@ import MapMarker from "./MapMarker";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
   interface Window {
-    naver: { maps: any };
+    kakao: { maps: any };
   }
 }
 
@@ -56,22 +50,22 @@ export default function NaverMapView({
   // ── 마커 픽셀 좌표 재계산 ──────────────────────────────────
   const recalc = useCallback(() => {
     const map = mapRef.current;
-    if (!map || typeof window === "undefined" || !window.naver) return;
+    if (!map || typeof window === "undefined" || !window.kakao) return;
 
     const proj = map.getProjection();
 
     setMarkers(
       hotspots.map((h) => {
-        const pt = proj.fromCoordToOffset(
-          new window.naver.maps.LatLng(h.lat, h.lng)
+        const pt = proj.pointFromCoords(
+          new window.kakao.maps.LatLng(h.lat, h.lng)
         );
         return { id: h.id, x: pt.x, y: pt.y };
       })
     );
 
     if (userLocation) {
-      const up = proj.fromCoordToOffset(
-        new window.naver.maps.LatLng(userLocation.lat, userLocation.lng)
+      const up = proj.pointFromCoords(
+        new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng)
       );
       setUserPos({ x: up.x, y: up.y });
     } else {
@@ -86,53 +80,42 @@ export default function NaverMapView({
 
   // ── 지도 초기화 ───────────────────────────────────────────
   const initMap = useCallback(() => {
-    if (!mapDivRef.current) {
-      console.error("[NaverMap] initMap() — mapDivRef.current is null!");
-      return;
-    }
+    if (!mapDivRef.current) return;
 
-    const N = window.naver.maps;
-    const map = new N.Map(mapDivRef.current, {
-      center: new N.LatLng(37.55, 126.95),
-      zoom: 13,
-      mapTypeControl: false,
-      zoomControl: false,
-      scaleControl: false,
-      logoControl: false,
-      mapDataControl: false,
+    const K = window.kakao.maps;
+    const map = new K.Map(mapDivRef.current, {
+      center: new K.LatLng(37.55, 126.95),
+      level: 5,
     });
     mapRef.current = map;
-    console.log("[NaverMap] Map Object Created!", map);
 
-    N.Event.addListener(map, "bounds_changed", scheduleRecalc);
-    N.Event.addListener(map, "zoom_changed",   scheduleRecalc);
-    N.Event.addListener(map, "idle",           recalc);
+    K.event.addListener(map, "bounds_changed", scheduleRecalc);
+    K.event.addListener(map, "zoom_changed",   scheduleRecalc);
+    K.event.addListener(map, "idle",           recalc);
 
     recalc();
     setStatus("ready");
   }, [recalc, scheduleRecalc]);
 
-  // ── Naver Maps SDK 스크립트 로드 ─────────────────────────
+  // ── 카카오 지도 SDK 스크립트 로드 ────────────────────────
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID;
-    if (!clientId) {
-      setErrorMsg("NEXT_PUBLIC_NAVER_MAP_CLIENT_ID 환경변수가 없습니다.");
+    const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY;
+    if (!appKey) {
+      setErrorMsg("NEXT_PUBLIC_KAKAO_MAP_APP_KEY 환경변수가 없습니다.");
       setStatus("error");
       return;
     }
 
-    // 15초 타임아웃
     const timeout = setTimeout(() => {
       setErrorMsg(
         `지도 로딩 시간 초과 (15초)\n` +
         `현재 Origin: ${window.location.origin}\n` +
-        `NCP에 이 URL이 Web 서비스 URL로 등록됐는지 확인하세요.`
+        `카카오 개발자 콘솔 > JavaScript SDK 도메인에 등록됐는지 확인하세요.`
       );
       setStatus("error");
     }, 15_000);
 
     const tryInitMap = () => {
-      // mapDivRef가 아직 null이면 한 프레임 뒤에 재시도
       if (!mapDivRef.current) {
         requestAnimationFrame(tryInitMap);
         return;
@@ -140,54 +123,36 @@ export default function NaverMapView({
       try {
         initMap();
       } catch (e) {
-        console.error("[NaverMap] initMap() threw:", e);
+        console.error("[KakaoMap] initMap() threw:", e);
         setErrorMsg(`지도 초기화 실패: ${String(e)}`);
         setStatus("error");
       }
     };
 
     // 이미 SDK가 로드된 경우
-    if (window.naver?.maps?.Map) {
+    if (window.kakao?.maps?.Map) {
       clearTimeout(timeout);
-      console.log("[NaverMap] SDK already present. origin:", window.location.origin);
       tryInitMap();
       return;
     }
 
     const script   = document.createElement("script");
-    script.src     = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}`;
+    script.src     = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
     script.async   = true;
 
     script.onload = () => {
       clearTimeout(timeout);
-      console.log("[NaverMap] SDK loaded. origin:", window.location.origin);
-
-      // 인증 실패 콜백 등록 — 어떤 URI로 인증 시도했는지 정확히 추적
-      if (window.naver?.maps?.onJSAuthError !== undefined) {
-        (window.naver.maps as any).onJSAuthError = (error: any) => {
-          console.error(
-            "[NaverMap] onJSAuthError:",
-            JSON.stringify(error, null, 2),
-            "\n인증 시도 URI:", window.location.href,
-            "\norigin:", window.location.origin,
-            "\nclientId:", clientId
-          );
-        };
-      }
-
-      tryInitMap();
+      window.kakao.maps.load(() => {
+        tryInitMap();
+      });
     };
 
     script.onerror = () => {
       clearTimeout(timeout);
-      console.error(
-        "[NaverMap] script.onerror — origin:", window.location.origin,
-        "clientId:", clientId
-      );
       setErrorMsg(
-        `SDK 스크립트 로드 실패 (네트워크 또는 도메인 거부)\n` +
+        `SDK 스크립트 로드 실패\n` +
         `현재 Origin: ${window.location.origin}\n` +
-        `NCP Application > Web 서비스 URL에 위 주소를 등록해주세요.`
+        `카카오 개발자 콘솔 > JavaScript SDK 도메인에 위 주소를 등록해주세요.`
       );
       setStatus("error");
     };
@@ -209,14 +174,13 @@ export default function NaverMapView({
   return (
     <div className="absolute inset-0 overflow-hidden">
 
-      {/* ── 레이어 1: 네이버 지도 타일 (그레이스케일 필터) ── */}
+      {/* ── 레이어 1: 카카오 지도 타일 (그레이스케일 필터) ── */}
       <div
         className="absolute inset-0"
         style={{
           filter: "grayscale(100%) brightness(108%) contrast(0.88) sepia(5%)",
         }}
       >
-        {/* mapDivRef는 항상 여기 붙어 있어야 initMap()이 DOM을 잡을 수 있음 */}
         <div
           ref={mapDivRef}
           style={{ width: "100%", height: "100%", display: "block" }}
