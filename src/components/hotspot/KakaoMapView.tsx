@@ -15,6 +15,7 @@ interface KakaoMapViewProps {
   userLocation: UserLocation | null;
   onBoundsChange?: (bounds: MapBounds) => void;
   panToUserTrigger?: number;
+  panToCoords?: { lat: number; lng: number; key: number };
 }
 
 type SDKStatus = "loading" | "ready" | "error";
@@ -57,6 +58,7 @@ export default function NaverMapView({
   userLocation,
   onBoundsChange,
   panToUserTrigger = 0,
+  panToCoords,
 }: KakaoMapViewProps) {
   const [status, setStatus]     = useState<SDKStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -281,6 +283,14 @@ export default function NaverMapView({
     syncMarkers(hotspots, selectedHotspot);
     syncUserMarker(userLocation);
   }, [status, hotspots, selectedHotspot, userLocation, mapZoom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 특정 좌표로 이동 (검색 결과 등) ───────────────────
+  useEffect(() => {
+    if (!panToCoords || status !== "ready" || !mapRef.current) return;
+    const N = window.naver.maps;
+    mapRef.current.panTo(new N.LatLng(panToCoords.lat, panToCoords.lng));
+    mapRef.current.setZoom(16);
+  }, [panToCoords?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 내 위치로 이동 ─────────────────────────────────────
   useEffect(() => {

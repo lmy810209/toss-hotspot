@@ -26,6 +26,7 @@ interface MapContainerProps {
   onBoundsChange: (bounds: MapBounds) => void;
   panToUserTrigger?: number;
   onPanToUser: () => void;
+  panToCoords?: { lat: number; lng: number; key: number };
 }
 
 export default function MapContainer({
@@ -37,6 +38,7 @@ export default function MapContainer({
   onBoundsChange,
   panToUserTrigger,
   onPanToUser,
+  panToCoords,
 }: MapContainerProps) {
   const handleLocate = async () => {
     onPanToUser();
@@ -52,6 +54,7 @@ export default function MapContainer({
         userLocation={userLocation}
         onBoundsChange={onBoundsChange}
         panToUserTrigger={panToUserTrigger}
+        panToCoords={panToCoords}
       />
 
       {/* 내 위치 버튼 */}
