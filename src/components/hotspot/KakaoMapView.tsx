@@ -156,7 +156,7 @@ export default function NaverMapView({
 
     const script = document.createElement("script");
     // submodules=panorama 로 POI 레이어(맛집·카페 아이콘) 풍부하게 로드
-    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=panorama`;
+    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}&submodules=panorama`;
     script.async = true;
     // Referer 헤더를 명시적으로 origin만 전송 (NCP 도메인 인증 통과)
     script.setAttribute("referrerpolicy", "strict-origin");
