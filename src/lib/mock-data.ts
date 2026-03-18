@@ -1,6 +1,6 @@
 import { Hotspot } from "./types";
 
-export const CATEGORIES = ["벚꽃", "맛집", "카페", "쇼핑", "공원"];
+export const CATEGORIES = ["벚꽃", "맛집", "카페", "쇼핑", "공원", "팝업"];
 
 export const MOCK_HOTSPOTS: Hotspot[] = [
   {
