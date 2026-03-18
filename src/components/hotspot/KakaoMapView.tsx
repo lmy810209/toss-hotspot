@@ -19,15 +19,14 @@ interface KakaoMapViewProps {
 
 type SDKStatus = "loading" | "ready" | "error";
 
-const LEVEL_COLOR: Record<number, string> = { 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" };
-const LEVEL_TEXT: Record<number, string>  = { 1: "여유", 2: "보통", 3: "붐빔" };
+// 여유=초록, 보통=노랑, 붐빔=빨강
+const LEVEL_COLOR: Record<number, string> = { 1: "#22c55e", 2: "#eab308", 3: "#ef4444" };
 
 function makeMarkerContent(hotspot: Hotspot, isSelected: boolean): string {
-  const color  = LEVEL_COLOR[hotspot.congestion_level];
-  const label  = LEVEL_TEXT[hotspot.congestion_level];
-  const scale  = isSelected ? "scale(1.15)" : "scale(1)";
-  const ring   = isSelected ? `outline:3px solid #3182F6;outline-offset:2px;` : "";
-  const glow   = isSelected ? `filter:drop-shadow(0 0 6px ${color});` : "";
+  const color = LEVEL_COLOR[hotspot.congestion_level];
+  const scale = isSelected ? "scale(1.2)" : "scale(1)";
+  const glow  = isSelected ? `filter:drop-shadow(0 0 8px ${color});` : "";
+  const ring  = isSelected ? `outline:3px solid #3182F6;outline-offset:2px;` : "";
 
   const tossBadge = hotspot.is_toss_place
     ? `<div style="display:flex;align-items:center;gap:3px;background:linear-gradient(135deg,#3182F6,#1c6ef3);color:#fff;font-size:10px;font-weight:900;padding:3px 8px;border-radius:99px;margin-bottom:3px;white-space:nowrap;box-shadow:0 2px 8px rgba(49,130,246,0.45);">💳 토스 단말기</div>`
@@ -36,18 +35,18 @@ function makeMarkerContent(hotspot: Hotspot, isSelected: boolean): string {
   return (
     `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:${scale};transition:transform 0.18s;${glow}">` +
     tossBadge +
-    `<div style="background:${color};color:#fff;font-size:12px;font-weight:800;padding:4px 12px;border-radius:99px;margin-bottom:5px;box-shadow:0 3px 10px ${color}88;white-space:nowrap;">${label}</div>` +
     `<div style="background:#fff;border-radius:50%;padding:7px;${ring}box-shadow:0 4px 14px rgba(0,0,0,0.22);">` +
-      `<svg width="24" height="24" viewBox="0 0 24 24" fill="${color}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>` +
+      `<svg width="26" height="26" viewBox="0 0 24 24" fill="${color}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>` +
     `</div>` +
+    `<span style="margin-top:3px;font-size:11px;font-weight:700;color:#111;background:rgba(255,255,255,0.95);padding:2px 7px;border-radius:5px;box-shadow:0 1px 4px rgba(0,0,0,0.15);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;">${hotspot.name}</span>` +
     `</div>`
   );
 }
 
-function makeClusterContent(count: number, maxLevel: number): string {
-  const color = LEVEL_COLOR[maxLevel] || "#3182F6";
+// 클러스터: 파란 원 + 흰색 숫자
+function makeClusterContent(count: number): string {
   return (
-    `<div style="background:${color};color:#fff;font-size:14px;font-weight:900;min-width:42px;height:42px;padding:0 10px;border-radius:21px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px ${color}99;border:3px solid #fff;cursor:pointer;white-space:nowrap;">${count}</div>`
+    `<div style="background:#3182F6;color:#fff;font-size:15px;font-weight:900;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(49,130,246,0.55);border:3px solid #fff;cursor:pointer;">${count}</div>`
   );
 }
 
@@ -121,11 +120,10 @@ export default function NaverMapView({
         } else {
           const lat      = cellSpots.reduce((s, h) => s + h.lat, 0) / cellSpots.length;
           const lng      = cellSpots.reduce((s, h) => s + h.lng, 0) / cellSpots.length;
-          const maxLevel = Math.max(...cellSpots.map((h) => h.congestion_level));
           const newZoom  = Math.min(zoom + 3, 16);
           toShow.set(`c_${cellKey}`, {
             lat, lng,
-            content: makeClusterContent(cellSpots.length, maxLevel),
+            content: makeClusterContent(cellSpots.length),
             anchor: new N.Point(21, 21),
             zIndex: 15,
             onClick: () => {
