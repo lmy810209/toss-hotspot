@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { Hotspot, UserLocation } from "@/lib/types";
+import { Hotspot, UserLocation, MapBounds } from "@/lib/types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare global {
@@ -14,6 +14,7 @@ interface KakaoMapViewProps {
   onSelectHotspot: (hotspot: Hotspot) => void;
   selectedHotspot: Hotspot | null;
   userLocation: UserLocation | null;
+  onBoundsChange?: (bounds: MapBounds) => void;
 }
 
 type SDKStatus = "loading" | "ready" | "error";
@@ -76,6 +77,7 @@ export default function NaverMapView({
   onSelectHotspot,
   selectedHotspot,
   userLocation,
+  onBoundsChange,
 }: KakaoMapViewProps) {
   const [status, setStatus]         = useState<SDKStatus>("loading");
   const [errorMsg, setErrorMsg]     = useState("");
@@ -207,10 +209,20 @@ export default function NaverMapView({
       selectedPlaceRef.current?.(null);
     });
 
-    // 지도 이동/줌 후 주변 장소 자동 검색
+    // 지도 이동/줌 후 bounds 콜백 + 주변 장소 자동 검색
     N.Event.addListener(map, "idle", () => {
       const c = map.getCenter();
       fetchPlaces(c.lat(), c.lng());
+
+      if (onBoundsChange) {
+        const bounds = map.getBounds();
+        onBoundsChange({
+          north: bounds.getNE().lat(),
+          south: bounds.getSW().lat(),
+          east:  bounds.getNE().lng(),
+          west:  bounds.getSW().lng(),
+        });
+      }
     });
 
     // 컨테이너 크기 재계산 + 초기 장소 검색

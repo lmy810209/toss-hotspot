@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import { Hotspot } from "@/lib/types";
+import { Hotspot, MapBounds } from "@/lib/types";
 import CategoryTabs from "@/components/hotspot/CategoryTabs";
 import MapContainer from "@/components/hotspot/MapContainer";
 import BottomSheet from "@/components/hotspot/BottomSheet";
@@ -15,12 +15,13 @@ export default function Home() {
   const [activeCategory, setActiveCategory] = useState("전체");
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
   const [showCoinAnimation, setShowCoinAnimation] = useState(false);
+  const [mapBounds, setMapBounds] = useState<MapBounds | undefined>(undefined);
 
   const { toast } = useToast();
   const { userLocation, isLoading: locationLoading, refresh: refreshLocation } = useLocation();
 
   // 카테고리를 Firestore 쿼리에 직접 전달 — 탭 클릭 시 서버 쿼리 변경
-  const { hotspots, isFirestoreConnected, reportCongestion } = useHotspots(activeCategory);
+  const { hotspots, isFirestoreConnected, reportCongestion } = useHotspots(activeCategory, mapBounds);
 
   const handleReport = useCallback(
     async (id: string, level: 1 | 2 | 3) => {
@@ -84,6 +85,7 @@ export default function Home() {
         selectedHotspot={selectedHotspot}
         userLocation={userLocation}
         onRefreshLocation={refreshLocation}
+        onBoundsChange={setMapBounds}
       />
 
       {/* 인기 급상승 위젯 */}

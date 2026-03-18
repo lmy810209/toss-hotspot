@@ -20,3 +20,10 @@ export interface UserLocation {
   lat: number;
   lng: number;
 }
+
+export interface MapBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}

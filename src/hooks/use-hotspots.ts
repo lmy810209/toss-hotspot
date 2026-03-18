@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MOCK_HOTSPOTS } from "@/lib/mock-data";
-import { Hotspot, CongestionLevel } from "@/lib/types";
+import { Hotspot, CongestionLevel, MapBounds } from "@/lib/types";
 
 /** 토스플레이스 가맹점을 최상단으로, 나머지는 report_count 내림차순 */
 function sortWithTossPlaceFirst(arr: Hotspot[]): Hotspot[] {
@@ -31,10 +31,15 @@ interface UseHotspotsReturn {
   reportCongestion: (id: string, level: CongestionLevel) => Promise<void>;
 }
 
-export function useHotspots(category: string = "전체"): UseHotspotsReturn {
+// bounds 변경 시 lat 범위가 0.01° 이상 달라질 때만 재쿼리
+const BOUNDS_THRESHOLD = 0.01;
+
+export function useHotspots(category: string = "전체", bounds?: MapBounds): UseHotspotsReturn {
   const [hotspots, setHotspots] = useState<Hotspot[]>(MOCK_HOTSPOTS);
   const [isFirestoreConnected, setIsFirestoreConnected] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  // 이전 bounds 저장 — 미세한 이동 시 재쿼리 방지
+  const prevBoundsRef = useRef<MapBounds | null>(null);
 
   // 카테고리 변경 시 mock 데이터 즉시 반영 (TossPlace 우선 정렬)
   useEffect(() => {
@@ -47,36 +52,57 @@ export function useHotspots(category: string = "전체"): UseHotspotsReturn {
     }
   }, [category, isFirestoreConnected]);
 
-  // Firestore 실시간 구독 — 카테고리가 바뀌면 쿼리 재구독
+  // Firestore 실시간 구독 — 카테고리 또는 지도 bounds 변경 시 재구독
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) return;
+
+    // bounds 미세 변경(< BOUNDS_THRESHOLD°) 시 재쿼리 생략
+    if (bounds && prevBoundsRef.current) {
+      const prev = prevBoundsRef.current;
+      const latDiff = Math.abs(bounds.south - prev.south) + Math.abs(bounds.north - prev.north);
+      if (latDiff < BOUNDS_THRESHOLD) return;
+    }
+    if (bounds) prevBoundsRef.current = bounds;
 
     // 이전 구독 해제
     unsubscribeRef.current?.();
 
     try {
       /**
-       * 카테고리별 Firestore 쿼리.
-       * '전체': report_count 내림차순 전체 조회
-       * 특정 카테고리: where('category', '==', ...) + orderBy 조합
-       *   → Firestore 복합 인덱스 필요: category ASC + report_count DESC
-       *   → Firebase Console > Firestore > 인덱스에서 자동 생성 링크 제공
+       * Geo 필터링: bounds 있으면 lat 범위 쿼리 (Firestore 단일 필드 range)
+       * → lng는 Firestore 쿼리 제한으로 클라이언트에서 필터
+       * → lat 인덱스 자동 생성됨 (단일 필드)
+       *
+       * bounds 없을 때: 기존 카테고리 쿼리 유지
        */
-      const q =
-        category === "전체"
-          ? query(collection(db, "hotspots"), orderBy("report_count", "desc"))
-          : query(
-              collection(db, "hotspots"),
-              where("category", "==", category),
-              orderBy("report_count", "desc")
-            );
+      const PAD = 0.02; // 화면 경계에서 약 2km 여유
+      let q;
+
+      if (bounds) {
+        // Geo 범위 쿼리: lat만 Firestore에서, lng는 클라이언트 필터
+        const conditions = [
+          where("lat", ">=", bounds.south - PAD),
+          where("lat", "<=", bounds.north + PAD),
+        ];
+        if (category !== "전체") {
+          // lat range + category 동시 사용 불가 → lat만 쿼리 후 클라이언트 필터
+        }
+        q = query(collection(db, "hotspots"), ...conditions, orderBy("lat", "asc"));
+      } else if (category === "전체") {
+        q = query(collection(db, "hotspots"), orderBy("report_count", "desc"));
+      } else {
+        q = query(
+          collection(db, "hotspots"),
+          where("category", "==", category),
+          orderBy("report_count", "desc")
+        );
+      }
 
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
           if (snapshot.empty) {
             setIsFirestoreConnected(false);
-            // mock 데이터로 fallback
             setHotspots(
               category === "전체"
                 ? MOCK_HOTSPOTS
@@ -86,7 +112,7 @@ export function useHotspots(category: string = "전체"): UseHotspotsReturn {
           }
 
           setIsFirestoreConnected(true);
-          const data: Hotspot[] = snapshot.docs.map((docSnap) => {
+          let data: Hotspot[] = snapshot.docs.map((docSnap) => {
             const d = docSnap.data();
             return {
               id: docSnap.id,
@@ -101,40 +127,22 @@ export function useHotspots(category: string = "전체"): UseHotspotsReturn {
               is_toss_place: d.is_toss_place ?? false,
             };
           });
-          // 토스플레이스 가맹점 최상단 노출
+
+          // 클라이언트 필터: lng 범위 + 카테고리(bounds 쿼리 시)
+          if (bounds) {
+            data = data.filter(
+              (h) => h.lng >= bounds.west - PAD && h.lng <= bounds.east + PAD
+            );
+            if (category !== "전체") {
+              data = data.filter((h) => h.category === category);
+            }
+          }
+
           setHotspots(sortWithTossPlaceFirst(data));
         },
         (err) => {
-          // 복합 인덱스 미생성 시 → where만 사용해 재시도
-          if (err.code === "failed-precondition" && category !== "전체") {
-            console.warn("[useHotspots] 복합 인덱스 없음, 클라이언트 정렬로 fallback");
-            const fallbackQ = query(
-              collection(db, "hotspots"),
-              where("category", "==", category)
-            );
-            onSnapshot(fallbackQ, (snap) => {
-              if (!snap.empty) {
-                setIsFirestoreConnected(true);
-                const data: Hotspot[] = snap.docs
-                  .map((d) => ({
-                    id: d.id,
-                    name: d.data().name ?? "",
-                    category: d.data().category ?? "",
-                    lat: d.data().lat ?? 0,
-                    lng: d.data().lng ?? 0,
-                    congestion_level: (d.data().congestion_level ?? 1) as CongestionLevel,
-                    last_updated: d.data().last_updated?.toDate?.() ?? new Date(),
-                    report_count: d.data().report_count ?? 0,
-                    description: d.data().description,
-                  }))
-                  .sort((a, b) => b.report_count - a.report_count);
-                setHotspots(sortWithTossPlaceFirst(data));
-              }
-            });
-          } else {
-            console.warn("[useHotspots] Firestore 오류, mock 사용:", err.message);
-            setIsFirestoreConnected(false);
-          }
+          console.warn("[useHotspots] Firestore 오류, mock 사용:", err.message);
+          setIsFirestoreConnected(false);
         }
       );
 
@@ -146,7 +154,7 @@ export function useHotspots(category: string = "전체"): UseHotspotsReturn {
     return () => {
       unsubscribeRef.current?.();
     };
-  }, [category]);
+  }, [category, bounds]);
 
   /**
    * 혼잡도 제보: Firestore 낙관적 업데이트 + serverTimestamp

@@ -1,6 +1,6 @@
 "use client";
 
-import { Hotspot, UserLocation } from "@/lib/types";
+import { Hotspot, UserLocation, MapBounds } from "@/lib/types";
 import { Navigation } from "lucide-react";
 import dynamic from "next/dynamic";
 
@@ -23,6 +23,7 @@ interface MapContainerProps {
   selectedHotspot: Hotspot | null;
   userLocation: UserLocation | null;
   onRefreshLocation: () => Promise<void>;
+  onBoundsChange: (bounds: MapBounds) => void;
 }
 
 export default function MapContainer({
@@ -31,6 +32,7 @@ export default function MapContainer({
   selectedHotspot,
   userLocation,
   onRefreshLocation,
+  onBoundsChange,
 }: MapContainerProps) {
   return (
     <div className="relative flex-1 w-full overflow-hidden">
@@ -39,6 +41,7 @@ export default function MapContainer({
         onSelectHotspot={onSelectHotspot}
         selectedHotspot={selectedHotspot}
         userLocation={userLocation}
+        onBoundsChange={onBoundsChange}
       />
 
       {/* 내 위치 새로고침 버튼 */}
