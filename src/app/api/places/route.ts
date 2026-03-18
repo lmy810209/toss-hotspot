@@ -57,6 +57,8 @@ export async function GET(req: NextRequest) {
   const headers = {
     "X-Naver-Client-Id":     NAVER_CLIENT_ID,
     "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
+    "Referer":               "https://nookup.co.kr",
+    "User-Agent":            "Mozilla/5.0",
   };
 
   const rawResults = await Promise.allSettled(
