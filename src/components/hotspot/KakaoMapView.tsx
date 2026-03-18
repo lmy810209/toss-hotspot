@@ -178,8 +178,12 @@ export default function NaverMapView({
       fetchPlaces(c.lat(), c.lng());
     });
 
-    // 컨테이너 크기 재계산
-    setTimeout(() => { N.Event.trigger(map, "resize"); }, 100);
+    // 컨테이너 크기 재계산 + 초기 장소 검색
+    setTimeout(() => {
+      N.Event.trigger(map, "resize");
+      const c = map.getCenter();
+      fetchPlaces(c.lat(), c.lng());
+    }, 500);
     setStatus("ready");
   }
 
