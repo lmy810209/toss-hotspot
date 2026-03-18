@@ -118,21 +118,35 @@ export default function NaverMapView({
     const N = window.naver.maps;
 
     const map = new N.Map(mapDivRef.current, {
-      center: new N.LatLng(37.553, 126.990), // 성수동↔연남동 중간
-      zoom: 13,
+      center: new N.LatLng(37.553, 126.990),
+      // zoom 14: 맛집·카페 POI 아이콘이 충분히 표시되는 레벨
+      zoom: 14,
       mapTypeId: N.MapTypeId.NORMAL,
-      // POI 최대 표시 옵션
       mapTypeControl: false,
       zoomControl: false,
       logoControl: true,
       scaleControl: false,
+      // 지도 최소/최대 줌 제한
+      minZoom: 10,
+      maxZoom: 20,
     });
 
     mapRef.current = map;
-    // 컨테이너 크기 재계산 (Vercel 정적 배포 환경에서 필요)
-    setTimeout(() => {
-      window.naver.maps.Event.trigger(map, "resize");
-    }, 100);
+
+    // 줌 레벨에 따라 마커 크기 조정
+    N.Event.addListener(map, "zoom_changed", () => {
+      const z = map.getZoom();
+      const scale = z >= 16 ? 1.2 : z >= 14 ? 1.0 : 0.82;
+      overlaysRef.current.forEach((ov) => {
+        const el = ov.getIcon?.()?.content;
+        if (el instanceof HTMLElement) {
+          el.style.transform = `scale(${scale})`;
+        }
+      });
+    });
+
+    // 컨테이너 크기 재계산
+    setTimeout(() => { N.Event.trigger(map, "resize"); }, 100);
     setStatus("ready");
   }
 
