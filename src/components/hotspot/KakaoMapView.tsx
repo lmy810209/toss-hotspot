@@ -25,6 +25,22 @@ interface PlaceInfo {
   color: string;
 }
 
+function makePlaceMarkerContent(name: string, color: string, category: string): string {
+  const label = /카페|커피|디저트/.test(category) ? "카페"
+    : /술|바|맥주/.test(category) ? "술집"
+    : /쇼핑|마트|편의점/.test(category) ? "쇼핑"
+    : "맛집";
+  return (
+    `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;transform:scale(1);transition:transform 0.18s;">` +
+    `<div style="background:${color};color:#fff;font-size:11px;font-weight:800;padding:3px 10px;border-radius:99px;margin-bottom:5px;box-shadow:0 3px 10px ${color}88;white-space:nowrap;">${label}</div>` +
+    `<div style="background:#fff;border-radius:50%;padding:6px;box-shadow:0 4px 14px rgba(0,0,0,0.22);">` +
+      `<svg width="20" height="20" viewBox="0 0 24 24" fill="${color}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>` +
+    `</div>` +
+    `<span style="margin-top:4px;font-size:11px;font-weight:700;color:#111;background:rgba(255,255,255,0.96);padding:2px 7px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.14);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;">${name}</span>` +
+    `</div>`
+  );
+}
+
 const LEVEL_COLOR: Record<number, string> = { 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" };
 const LEVEL_TEXT: Record<number, string>  = { 1: "여유", 2: "보통", 3: "붐빔" };
 
@@ -141,11 +157,7 @@ export default function NaverMapView({
         const N = window.naver.maps;
 
         data.places.forEach((p: any) => {
-          const content =
-            `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">` +
-            `<div style="background:white;border:2px solid ${p.color};border-radius:8px;padding:2px 7px;font-size:10px;font-weight:700;color:${p.color};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15);max-width:80px;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>` +
-            `<div style="width:7px;height:7px;background:${p.color};border-radius:50%;margin-top:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>` +
-            `</div>`;
+          const content = makePlaceMarkerContent(p.name, p.color, p.category || "");
 
           const m = new N.Marker({
             position: new N.LatLng(p.lat, p.lng),
