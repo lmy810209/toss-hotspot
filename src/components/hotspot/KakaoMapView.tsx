@@ -17,6 +17,14 @@ interface KakaoMapViewProps {
 
 type SDKStatus = "loading" | "ready" | "error";
 
+interface PlaceInfo {
+  name: string;
+  category: string;
+  address: string;
+  link: string;
+  color: string;
+}
+
 const LEVEL_COLOR: Record<number, string> = { 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" };
 const LEVEL_TEXT: Record<number, string>  = { 1: "여유", 2: "보통", 3: "붐빔" };
 
@@ -49,8 +57,9 @@ export default function NaverMapView({
   selectedHotspot,
   userLocation,
 }: KakaoMapViewProps) {
-  const [status, setStatus]     = useState<SDKStatus>("loading");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [status, setStatus]         = useState<SDKStatus>("loading");
+  const [errorMsg, setErrorMsg]     = useState("");
+  const [selectedPlace, setSelectedPlace] = useState<PlaceInfo | null>(null);
 
   const mapDivRef       = useRef<HTMLDivElement>(null);
   const mapRef          = useRef<any>(null);
@@ -133,8 +142,7 @@ export default function NaverMapView({
 
         data.places.forEach((p: any) => {
           const content =
-            `<div onclick="window.open('${p.link || `https://map.naver.com/v5/search/${encodeURIComponent(p.name)}`}','_blank')" ` +
-            `style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">` +
+            `<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">` +
             `<div style="background:white;border:2px solid ${p.color};border-radius:8px;padding:2px 7px;font-size:10px;font-weight:700;color:${p.color};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15);max-width:80px;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>` +
             `<div style="width:7px;height:7px;background:${p.color};border-radius:50%;margin-top:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>` +
             `</div>`;
@@ -145,6 +153,13 @@ export default function NaverMapView({
             icon: { content, anchor: new N.Point(0, 1) },
             zIndex: 5,
           });
+          N.Event.addListener(m, "click", () => setSelectedPlace({
+            name: p.name,
+            category: p.category,
+            address: p.address,
+            link: p.link,
+            color: p.color,
+          }));
           placeMarkersRef.current.push(m);
         });
       } catch { /* 검색 실패 시 무시 */ }
@@ -244,6 +259,38 @@ export default function NaverMapView({
     <div className="absolute inset-0 overflow-hidden">
       {/* 네이버 지도 */}
       <div ref={mapDivRef} className="absolute inset-0" style={{ width: "100%", height: "100%" }} />
+
+      {/* 장소 카드 */}
+      {selectedPlace && (
+        <div className="absolute bottom-28 left-4 z-20 bg-white rounded-2xl shadow-xl p-4 w-64">
+          <div className="flex items-start justify-between mb-2">
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full border"
+              style={{ color: selectedPlace.color, borderColor: selectedPlace.color }}
+            >
+              {selectedPlace.category || "장소"}
+            </span>
+            <button
+              onClick={() => setSelectedPlace(null)}
+              className="text-gray-400 hover:text-gray-600 text-lg leading-none ml-2"
+            >×</button>
+          </div>
+          <p className="font-bold text-gray-900 text-sm mb-1 leading-snug">{selectedPlace.name}</p>
+          {selectedPlace.address && (
+            <p className="text-xs text-gray-400 mb-3 leading-snug">{selectedPlace.address}</p>
+          )}
+          <button
+            onClick={() => window.open(
+              selectedPlace.link || `https://map.naver.com/v5/search/${encodeURIComponent(selectedPlace.name)}`,
+              "_blank"
+            )}
+            className="w-full py-2 rounded-xl text-xs font-bold text-white"
+            style={{ backgroundColor: selectedPlace.color }}
+          >
+            네이버 지도에서 보기
+          </button>
+        </div>
+      )}
 
       {/* 줌 컨트롤 */}
       {status === "ready" && (
