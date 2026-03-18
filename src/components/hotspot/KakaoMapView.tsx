@@ -129,6 +129,10 @@ export default function NaverMapView({
     });
 
     mapRef.current = map;
+    // 컨테이너 크기 재계산 (Vercel 정적 배포 환경에서 필요)
+    setTimeout(() => {
+      window.naver.maps.Event.trigger(map, "resize");
+    }, 100);
     setStatus("ready");
   }
 
@@ -188,7 +192,7 @@ export default function NaverMapView({
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* 네이버 지도 */}
-      <div ref={mapDivRef} className="absolute inset-0" />
+      <div ref={mapDivRef} className="absolute inset-0" style={{ width: "100%", height: "100%" }} />
 
       {/* 줌 컨트롤 */}
       {status === "ready" && (
