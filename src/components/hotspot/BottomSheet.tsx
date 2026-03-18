@@ -14,6 +14,7 @@ import {
   Share2,
   Eye,
   ExternalLink,
+  Coins,
 } from "lucide-react";
 import { useViewerCount } from "@/hooks/use-viewer-count";
 
@@ -67,7 +68,8 @@ export default function BottomSheet({
   const [isReporting, setIsReporting]   = useState(false);
   const [reportSuccess, setReportSuccess] = useState(false);
   const [shareFeedback, setShareFeedback] = useState<"" | "copied" | "shared">("");
-  const sheetRef = useRef<HTMLDivElement>(null);
+  const sheetRef    = useRef<HTMLDivElement>(null);
+  const reportRef   = useRef<HTMLDivElement>(null);
 
   const viewerCount = useViewerCount(hotspot?.id ?? null);
 
@@ -254,24 +256,41 @@ export default function BottomSheet({
 
             <div className="h-px bg-toss-gray-100" />
 
-            {/* 공유 */}
-            <button
-              onClick={handleShare}
-              className="w-full flex items-center gap-3 bg-toss-gray-50 hover:bg-toss-gray-100 active:scale-[0.98] rounded-2xl px-4 py-3 border border-toss-gray-200 transition-all"
-            >
-              <div className="w-8 h-8 rounded-full bg-toss-gray-200 flex items-center justify-center shrink-0">
-                <Share2 className="w-4 h-4 text-toss-gray-700" />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-bold text-toss-gray-900">
-                  {shareFeedback === "copied" ? "링크 복사됨!" : shareFeedback === "shared" ? "공유 완료!" : "친구에게 공유하고 +10원"}
-                </p>
-                <p className="text-xs text-toss-gray-400">제보하면 나도 10원, 친구도 10원</p>
-              </div>
-            </button>
+            {/* CTA 버튼 2개 나란히 */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* 제보하고 10원 받기 */}
+              <button
+                onClick={() => reportRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 active:scale-95 rounded-2xl px-3 py-3.5 border border-primary/15 transition-all"
+              >
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Coins className="w-4 h-4 text-primary" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-toss-gray-900">제보하고</p>
+                  <p className="text-xs font-black text-primary">10원 받기</p>
+                </div>
+              </button>
+
+              {/* 친구 공유 +10원 */}
+              <button
+                onClick={handleShare}
+                className="flex items-center gap-2 bg-toss-gray-50 hover:bg-toss-gray-100 active:scale-95 rounded-2xl px-3 py-3.5 border border-toss-gray-200 transition-all"
+              >
+                <div className="w-8 h-8 rounded-full bg-toss-gray-200 flex items-center justify-center shrink-0">
+                  <Share2 className="w-4 h-4 text-toss-gray-700" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold text-toss-gray-900">
+                    {shareFeedback === "copied" ? "복사됨!" : shareFeedback === "shared" ? "공유됨!" : "친구 공유"}
+                  </p>
+                  <p className="text-xs font-black text-toss-gray-500">+10원 더</p>
+                </div>
+              </button>
+            </div>
 
             {/* 제보 버튼 */}
-            <div className="space-y-3">
+            <div className="space-y-3" ref={reportRef}>
               <h3 className="font-bold text-toss-gray-900">지금 어때요? <span className="text-xs font-normal text-primary">제보하면 10원 적립!</span></h3>
 
               {!canReport && distance !== null && (
