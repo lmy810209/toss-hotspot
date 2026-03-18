@@ -279,11 +279,7 @@ export default function BottomSheet({
             {!canReport && distance !== null && (
               <div className="flex items-start gap-2.5 bg-orange-50 border border-orange-100 rounded-2xl p-3.5 text-sm text-orange-700">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>
-                  100m 이내에 있어야 제보할 수 있어요.
-                  <br />
-                  <span className="font-semibold">현재 {Math.round(distance)}m</span> 떨어져 있어요.
-                </span>
+                <span>근처에 있을 때 제보할 수 있어요.</span>
               </div>
             )}
 

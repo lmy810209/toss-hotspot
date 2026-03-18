@@ -14,6 +14,7 @@ interface KakaoMapViewProps {
   selectedHotspot: Hotspot | null;
   userLocation: UserLocation | null;
   onBoundsChange?: (bounds: MapBounds) => void;
+  panToUserTrigger?: number;
 }
 
 type SDKStatus = "loading" | "ready" | "error";
@@ -39,8 +40,14 @@ function makeMarkerContent(hotspot: Hotspot, isSelected: boolean): string {
     `<div style="background:#fff;border-radius:50%;padding:7px;${ring}box-shadow:0 4px 14px rgba(0,0,0,0.22);">` +
       `<svg width="24" height="24" viewBox="0 0 24 24" fill="${color}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>` +
     `</div>` +
-    `<span style="margin-top:4px;font-size:12px;font-weight:700;color:#111;background:rgba(255,255,255,0.96);padding:2px 8px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.14);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;">${hotspot.name}</span>` +
     `</div>`
+  );
+}
+
+function makeClusterContent(count: number, maxLevel: number): string {
+  const color = LEVEL_COLOR[maxLevel] || "#3182F6";
+  return (
+    `<div style="background:${color};color:#fff;font-size:14px;font-weight:900;min-width:42px;height:42px;padding:0 10px;border-radius:21px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px ${color}99;border:3px solid #fff;cursor:pointer;white-space:nowrap;">${count}</div>`
   );
 }
 
@@ -50,43 +57,105 @@ export default function NaverMapView({
   selectedHotspot,
   userLocation,
   onBoundsChange,
+  panToUserTrigger = 0,
 }: KakaoMapViewProps) {
   const [status, setStatus]     = useState<SDKStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const [mapZoom, setMapZoom]   = useState(14);
 
-  const mapDivRef  = useRef<HTMLDivElement>(null);
-  const mapRef     = useRef<any>(null);
-  const markersRef = useRef<Map<string, any>>(new Map());
-  const userMarker = useRef<any>(null);
+  const mapDivRef        = useRef<HTMLDivElement>(null);
+  const mapRef           = useRef<any>(null);
+  const markersRef       = useRef<Map<string, any>>(new Map());
+  const userMarker       = useRef<any>(null);
+  const lastPanTrigger   = useRef(0);
 
-  // ── 마커 동기화 ────────────────────────────────────────
+  // ── 마커 동기화 (클러스터링 포함) ──────────────────────
   function syncMarkers(spots: Hotspot[], selected: Hotspot | null) {
     const N   = window.naver.maps;
     const map = mapRef.current;
+    if (!map) return;
+
+    const zoom     = map.getZoom() as number;
     const existing = markersRef.current;
 
-    const ids = new Set(spots.map((h) => h.id));
-    existing.forEach((m, id) => {
-      if (!ids.has(id)) { m.setMap(null); existing.delete(id); }
+    // 표시할 마커 목록 계산
+    const toShow = new Map<string, {
+      lat: number; lng: number; content: string;
+      anchor: any; zIndex: number; onClick: () => void;
+    }>();
+
+    if (zoom >= 14) {
+      // 줌 14 이상: 개별 마커
+      spots.forEach((h) => {
+        const isSelected = selected?.id === h.id;
+        toShow.set(`s_${h.id}`, {
+          lat: h.lat, lng: h.lng,
+          content: makeMarkerContent(h, isSelected),
+          anchor: new N.Point(0, 1),
+          zIndex: isSelected ? 20 : 10,
+          onClick: () => onSelectHotspot(h),
+        });
+      });
+    } else {
+      // 줌 13 이하: 그리드 클러스터링
+      const gridSize = zoom >= 12 ? 0.03 : zoom >= 10 ? 0.08 : 0.2;
+      const cells    = new Map<string, Hotspot[]>();
+
+      for (const spot of spots) {
+        const key = `${Math.floor(spot.lat / gridSize)}_${Math.floor(spot.lng / gridSize)}`;
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key)!.push(spot);
+      }
+
+      cells.forEach((cellSpots, cellKey) => {
+        if (cellSpots.length === 1) {
+          const h          = cellSpots[0];
+          const isSelected = selected?.id === h.id;
+          toShow.set(`s_${h.id}`, {
+            lat: h.lat, lng: h.lng,
+            content: makeMarkerContent(h, isSelected),
+            anchor: new N.Point(0, 1),
+            zIndex: isSelected ? 20 : 10,
+            onClick: () => onSelectHotspot(h),
+          });
+        } else {
+          const lat      = cellSpots.reduce((s, h) => s + h.lat, 0) / cellSpots.length;
+          const lng      = cellSpots.reduce((s, h) => s + h.lng, 0) / cellSpots.length;
+          const maxLevel = Math.max(...cellSpots.map((h) => h.congestion_level));
+          const newZoom  = Math.min(zoom + 3, 16);
+          toShow.set(`c_${cellKey}`, {
+            lat, lng,
+            content: makeClusterContent(cellSpots.length, maxLevel),
+            anchor: new N.Point(21, 21),
+            zIndex: 15,
+            onClick: () => {
+              map.setCenter(new N.LatLng(lat, lng));
+              map.setZoom(newZoom);
+            },
+          });
+        }
+      });
+    }
+
+    // 불필요한 마커 제거
+    existing.forEach((m, key) => {
+      if (!toShow.has(key)) { m.setMap(null); existing.delete(key); }
     });
 
-    spots.forEach((h) => {
-      const isSelected = selected?.id === h.id;
-      const content    = makeMarkerContent(h, isSelected);
-
-      if (existing.has(h.id)) {
-        const m = existing.get(h.id);
-        m.setIcon({ content, anchor: new N.Point(0, 1) });
-        m.setZIndex(isSelected ? 20 : 10);
+    // 추가/업데이트
+    toShow.forEach(({ lat, lng, content, anchor, zIndex, onClick }, key) => {
+      if (existing.has(key)) {
+        existing.get(key).setIcon({ content, anchor });
+        existing.get(key).setZIndex(zIndex);
       } else {
         const m = new N.Marker({
-          position: new N.LatLng(h.lat, h.lng),
+          position: new N.LatLng(lat, lng),
           map,
-          icon: { content, anchor: new N.Point(0, 1) },
-          zIndex: isSelected ? 20 : 10,
+          icon: { content, anchor },
+          zIndex,
         });
-        N.Event.addListener(m, "click", () => onSelectHotspot(h));
-        existing.set(h.id, m);
+        N.Event.addListener(m, "click", onClick);
+        existing.set(key, m);
       }
     });
   }
@@ -133,7 +202,12 @@ export default function NaverMapView({
 
     mapRef.current = map;
 
-    // 지도 이동/줌 후 bounds 콜백
+    // 줌 변경 → 클러스터 재계산
+    N.Event.addListener(map, "zoom_changed", () => {
+      setMapZoom(map.getZoom());
+    });
+
+    // idle → bounds 콜백
     N.Event.addListener(map, "idle", () => {
       if (onBoundsChange) {
         const bounds = map.getBounds();
@@ -146,7 +220,7 @@ export default function NaverMapView({
       }
     });
 
-    // 초기 bounds 전달
+    // 초기 bounds
     setTimeout(() => {
       N.Event.trigger(map, "resize");
       if (onBoundsChange) {
@@ -203,12 +277,22 @@ export default function NaverMapView({
     return () => { clearTimeout(timeout); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── 데이터 변경 시 마커 갱신 ──────────────────────────
+  // ── 데이터 변경 시 마커 갱신 (줌 변경 포함) ───────────
   useEffect(() => {
     if (status !== "ready") return;
     syncMarkers(hotspots, selectedHotspot);
     syncUserMarker(userLocation);
-  }, [status, hotspots, selectedHotspot, userLocation]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, hotspots, selectedHotspot, userLocation, mapZoom]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 내 위치로 이동 ─────────────────────────────────────
+  useEffect(() => {
+    if (!panToUserTrigger || panToUserTrigger === lastPanTrigger.current) return;
+    if (status !== "ready" || !mapRef.current || !userLocation) return;
+    lastPanTrigger.current = panToUserTrigger;
+    const N = window.naver.maps;
+    mapRef.current.panTo(new N.LatLng(userLocation.lat, userLocation.lng));
+    mapRef.current.setZoom(15);
+  }, [panToUserTrigger, userLocation, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function zoomIn()  { mapRef.current?.setZoom(mapRef.current.getZoom() + 1); }
   function zoomOut() { mapRef.current?.setZoom(mapRef.current.getZoom() - 1); }

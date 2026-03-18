@@ -24,6 +24,8 @@ interface MapContainerProps {
   userLocation: UserLocation | null;
   onRefreshLocation: () => Promise<void>;
   onBoundsChange: (bounds: MapBounds) => void;
+  panToUserTrigger?: number;
+  onPanToUser: () => void;
 }
 
 export default function MapContainer({
@@ -33,7 +35,14 @@ export default function MapContainer({
   userLocation,
   onRefreshLocation,
   onBoundsChange,
+  panToUserTrigger,
+  onPanToUser,
 }: MapContainerProps) {
+  const handleLocate = async () => {
+    onPanToUser();
+    await onRefreshLocation();
+  };
+
   return (
     <div className="relative flex-1 w-full overflow-hidden">
       <LeafletMapView
@@ -42,16 +51,18 @@ export default function MapContainer({
         selectedHotspot={selectedHotspot}
         userLocation={userLocation}
         onBoundsChange={onBoundsChange}
+        panToUserTrigger={panToUserTrigger}
       />
 
-      {/* 내 위치 새로고침 버튼 */}
+      {/* 내 위치 버튼 */}
       <div className="absolute bottom-6 right-6 z-[1000]">
         <button
-          onClick={onRefreshLocation}
-          className="p-3 bg-white rounded-full toss-shadow hover:bg-toss-gray-50 transition-colors text-primary border border-toss-gray-200"
+          onClick={handleLocate}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white rounded-full toss-shadow hover:bg-toss-gray-50 active:scale-95 transition-all text-primary border border-toss-gray-200 text-sm font-bold"
           title="내 위치로"
         >
-          <Navigation className="w-5 h-5" />
+          <Navigation className="w-4 h-4" />
+          내 위치
         </button>
       </div>
     </div>

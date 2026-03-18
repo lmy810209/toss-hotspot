@@ -16,6 +16,7 @@ export default function Home() {
   const [selectedHotspot, setSelectedHotspot] = useState<Hotspot | null>(null);
   const [showCoinAnimation, setShowCoinAnimation] = useState(false);
   const [mapBounds, setMapBounds] = useState<MapBounds | undefined>(undefined);
+  const [panTrigger, setPanTrigger] = useState(0);
 
   const { toast } = useToast();
   const { userLocation, isLoading: locationLoading, refresh: refreshLocation } = useLocation();
@@ -38,9 +39,9 @@ export default function Home() {
     [reportCongestion, toast]
   );
 
-  // 인기 급상승 (제보 수 1위)
-  const trendingSpot = useMemo(
-    () => [...hotspots].sort((a, b) => b.report_count - a.report_count)[0],
+  // 인기 급상승 top 3
+  const topSpots = useMemo(
+    () => [...hotspots].sort((a, b) => b.report_count - a.report_count).slice(0, 3),
     [hotspots]
   );
 
@@ -86,24 +87,45 @@ export default function Home() {
         userLocation={userLocation}
         onRefreshLocation={refreshLocation}
         onBoundsChange={setMapBounds}
+        panToUserTrigger={panTrigger}
+        onPanToUser={() => setPanTrigger((t) => t + 1)}
       />
 
       {/* 인기 급상승 위젯 */}
-      {trendingSpot && (
-        <div className="absolute bottom-6 left-6 z-10 pointer-events-none">
-          <div className="bg-white/95 backdrop-blur-md p-3.5 rounded-2xl toss-shadow border border-toss-gray-200 pointer-events-auto max-w-[220px]">
-            <p className="text-[10px] font-bold text-toss-gray-400 uppercase tracking-wide mb-1.5">
-              {activeCategory === "전체" ? "인기 급상승" : `${activeCategory} 인기`}
-            </p>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shrink-0" />
-              <span className="text-sm font-bold text-toss-gray-900 truncate">
-                {trendingSpot.name}
-              </span>
+      {topSpots.length > 0 && (
+        <div className="absolute bottom-20 left-4 z-10 pointer-events-none">
+          <div className="bg-white/96 backdrop-blur-md rounded-2xl toss-shadow border border-toss-gray-200 pointer-events-auto w-[230px] overflow-hidden">
+            <div className="px-4 pt-3 pb-2.5 border-b border-toss-gray-100 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
+              <p className="text-[10px] font-bold text-toss-gray-500 uppercase tracking-wide">
+                {activeCategory === "전체" ? "인기 급상승" : `${activeCategory} 인기`}
+              </p>
             </div>
-            <p className="text-[11px] text-toss-gray-400 mt-0.5">
-              {trendingSpot.report_count}명 제보
-            </p>
+            <div className="divide-y divide-toss-gray-50">
+              {topSpots.map((spot, i) => {
+                const levelColor = ({ 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" } as Record<number, string>)[spot.congestion_level];
+                const levelText  = ({ 1: "여유", 2: "보통", 3: "붐빔" } as Record<number, string>)[spot.congestion_level];
+                return (
+                  <button
+                    key={spot.id}
+                    onClick={() => setSelectedHotspot(spot)}
+                    className="w-full text-left px-3.5 py-2.5 hover:bg-toss-gray-50 active:bg-toss-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-toss-gray-300 w-3 shrink-0">{i + 1}</span>
+                      <span className="flex-1 text-sm font-bold text-toss-gray-900 truncate">{spot.name}</span>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0"
+                        style={{ background: levelColor }}
+                      >
+                        {levelText}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-toss-gray-400 mt-0.5 ml-5">{spot.report_count}명 제보</p>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
