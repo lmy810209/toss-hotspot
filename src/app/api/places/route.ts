@@ -18,6 +18,7 @@ function categoryColor(cat: string): string {
   if (/카페|커피|디저트|베이커리/.test(cat)) return "#f59e0b";
   if (/술|바|맥주|막걸리/.test(cat))          return "#8b5cf6";
   if (/쇼핑|마트|편의점/.test(cat))           return "#3182F6";
+  if (/공원|자연|산|숲/.test(cat))            return "#22c55e";
   return "#f97316"; // 음식점 default
 }
 
@@ -52,8 +53,8 @@ export async function GET(req: NextRequest) {
     }
   } catch { /* 역지오코딩 실패 시 기본값 사용 */ }
 
-  // 2. 카테고리별 병렬 검색 (맛집 / 카페 / 술집)
-  const queries = ["맛집", "카페", "술집"];
+  // 2. 카테고리별 병렬 검색
+  const queries = ["맛집", "카페", "쇼핑", "공원"];
   const headers = {
     "X-Naver-Client-Id":     NAVER_CLIENT_ID,
     "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
