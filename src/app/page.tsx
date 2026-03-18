@@ -22,6 +22,7 @@ export default function Home() {
   const [panToCoords, setPanToCoords] = useState<{ lat: number; lng: number; key: number } | undefined>();
   const [showSearch, setShowSearch] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(true); // 초기값 true → 깜빡임 방지
+  const [radius, setRadius] = useState<1 | 3 | 5>(3); // km
 
   const { toast } = useToast();
   const { userLocation, isLoading: locationLoading, refresh: refreshLocation } = useLocation();
@@ -55,10 +56,32 @@ export default function Home() {
     setPanToCoords({ lat: spot.lat, lng: spot.lng, key: Date.now() });
   }, []);
 
-  const topSpots = useMemo(
-    () => [...hotspots].sort((a, b) => b.report_count - a.report_count).slice(0, 3),
-    [hotspots]
-  );
+  // 거리 계산 (m)
+  const getDistance = useCallback((lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371000;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }, []);
+
+  // 반경 내 TOP 3 추천 (거리 + 혼잡도 + 제보 수 점수화)
+  const topSpots = useMemo(() => {
+    if (!userLocation) return [];
+    const radiusM = radius * 1000;
+    const scored = hotspots
+      .map((h) => {
+        const dist = getDistance(userLocation.lat, userLocation.lng, h.lat, h.lng);
+        if (dist > radiusM) return null;
+        // 점수: 가까울수록 높음 + 여유(1)>보통(2)>붐빔(3) 가중 + 제보 수 보너스
+        const distScore = Math.max(0, 1 - dist / radiusM) * 50; // 0~50
+        const congestionScore = (4 - h.congestion_level) * 15; // 여유=45, 보통=30, 붐빔=15
+        const reportScore = Math.min(h.report_count, 20); // 0~20
+        return { ...h, dist, score: distScore + congestionScore + reportScore };
+      })
+      .filter(Boolean) as (Hotspot & { dist: number; score: number })[];
+    return scored.sort((a, b) => b.score - a.score).slice(0, 3);
+  }, [hotspots, userLocation, radius, getDistance]);
 
   return (
     <main className="flex flex-col h-screen w-full bg-background font-body relative overflow-hidden">
@@ -138,20 +161,51 @@ export default function Home() {
         panToCoords={panToCoords}
       />
 
-      {/* 인기 급상승 위젯 */}
-      {topSpots.length > 0 && (
-        <div className="absolute bottom-20 left-4 z-10 pointer-events-none">
-          <div className="bg-white/96 backdrop-blur-md rounded-2xl toss-shadow border border-toss-gray-200 pointer-events-auto w-[230px] overflow-hidden">
-            <div className="px-4 pt-3 pb-2.5 border-b border-toss-gray-100 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shrink-0" />
-              <p className="text-[10px] font-bold text-toss-gray-500 uppercase tracking-wide">
-                {activeCategory === "전체" ? "인기 급상승" : `${activeCategory} 인기`}
-              </p>
+      {/* 지금 갈만한 곳 TOP 3 */}
+      <div className="absolute bottom-20 left-4 z-10 pointer-events-none">
+        <div className="bg-white/96 backdrop-blur-md rounded-2xl toss-shadow border border-toss-gray-200 pointer-events-auto w-[250px] overflow-hidden">
+          {/* 헤더 + 반경 선택 */}
+          <div className="px-4 pt-3 pb-2.5 border-b border-toss-gray-100">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shrink-0" />
+              <p className="text-[11px] font-bold text-toss-gray-700">지금 갈만한 곳</p>
             </div>
+            <div className="flex gap-1.5">
+              {([1, 3, 5] as const).map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRadius(r)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                    radius === r
+                      ? "bg-primary text-white shadow-sm"
+                      : "bg-toss-gray-100 text-toss-gray-500 hover:bg-toss-gray-200"
+                  }`}
+                >
+                  {r}km
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 추천 목록 */}
+          {!userLocation ? (
+            <div className="px-4 py-4 text-center">
+              <p className="text-[11px] text-toss-gray-400">위치 정보가 필요해요</p>
+              <p className="text-[10px] text-toss-gray-300 mt-0.5">&apos;내 위치&apos; 버튼을 눌러주세요</p>
+            </div>
+          ) : topSpots.length === 0 ? (
+            <div className="px-4 py-4 text-center">
+              <p className="text-[11px] text-toss-gray-400 font-bold">근처 데이터가 부족해요</p>
+              <p className="text-[10px] text-toss-gray-300 mt-0.5">반경을 넓혀보세요</p>
+            </div>
+          ) : (
             <div className="divide-y divide-toss-gray-50">
               {topSpots.map((spot, i) => {
                 const levelColor = ({ 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" } as Record<number, string>)[spot.congestion_level];
                 const levelText  = ({ 1: "여유", 2: "보통", 3: "붐빔" } as Record<number, string>)[spot.congestion_level];
+                const distText = spot.dist < 1000
+                  ? `${Math.round(spot.dist)}m`
+                  : `${(spot.dist / 1000).toFixed(1)}km`;
                 return (
                   <button
                     key={spot.id}
@@ -159,20 +213,24 @@ export default function Home() {
                     className="w-full text-left px-3.5 py-2.5 hover:bg-toss-gray-50 active:bg-toss-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black text-toss-gray-300 w-3 shrink-0">{i + 1}</span>
+                      <span className="text-sm font-black text-primary w-4 shrink-0">{i + 1}</span>
                       <span className="flex-1 text-sm font-bold text-toss-gray-900 truncate">{spot.name}</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: levelColor }}>
                         {levelText}
                       </span>
                     </div>
-                    <p className="text-[10px] text-toss-gray-400 mt-0.5 ml-5">{spot.report_count}명 제보</p>
+                    <div className="flex items-center gap-2 mt-0.5 ml-6">
+                      <span className="text-[10px] text-primary font-bold">{distText}</span>
+                      <span className="text-[10px] text-toss-gray-300">·</span>
+                      <span className="text-[10px] text-toss-gray-400">{spot.report_count}명 제보</span>
+                    </div>
                   </button>
                 );
               })}
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* 바텀 시트 */}
       {selectedHotspot && (
