@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const NCP_KEY_ID     = process.env.NCP_KEY_ID     || "1w6j8to1o1";
 const NCP_KEY_SECRET = process.env.NCP_KEY_SECRET  || "";
 const NAVER_CLIENT_ID     = process.env.NAVER_LOCAL_CLIENT_ID     || "6I9WEWTWPAPDgSvf1O5x";
-const NAVER_CLIENT_SECRET = process.env.NAVER_LOCAL_CLIENT_SECRET || "hidHpVqStc";
+const NAVER_CLIENT_SECRET = process.env.NAVER_LOCAL_CLIENT_SECRET || "Z9n6LwbBRB";
 
 // Naver Local Search mapx/mapy → WGS84 변환
 function toWGS84(val: string) {
