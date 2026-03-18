@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const NCP_KEY_ID     = process.env.NCP_KEY_ID     || "1w6j8to1o1";
-const NCP_KEY_SECRET = process.env.NCP_KEY_SECRET  || "";
+const NCP_KEY_SECRET = process.env.NCP_KEY_SECRET  || "SQ1Ax8aLahy3niZOJHl8H6O5HboxEQQfCQSkvEtF";
 const NAVER_CLIENT_ID     = process.env.NAVER_LOCAL_CLIENT_ID     || "6l9WEWTWPAPDgSvf1O5x";
 const NAVER_CLIENT_SECRET = process.env.NAVER_LOCAL_CLIENT_SECRET || "9lpLogIryD";
 
