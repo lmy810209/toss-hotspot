@@ -17,14 +17,6 @@ interface KakaoMapViewProps {
 
 type SDKStatus = "loading" | "ready" | "error";
 
-interface PlaceInfo {
-  name: string;
-  category: string;
-  address: string;
-  link: string;
-  color: string;
-}
-
 function makePlaceMarkerContent(name: string, color: string, category: string): string {
   const label = /카페|커피|디저트/.test(category) ? "카페"
     : /술|바|맥주/.test(category) ? "술집"
@@ -73,9 +65,8 @@ export default function NaverMapView({
   selectedHotspot,
   userLocation,
 }: KakaoMapViewProps) {
-  const [status, setStatus]         = useState<SDKStatus>("loading");
-  const [errorMsg, setErrorMsg]     = useState("");
-  const [selectedPlace, setSelectedPlace] = useState<PlaceInfo | null>(null);
+  const [status, setStatus]     = useState<SDKStatus>("loading");
+  const [errorMsg, setErrorMsg] = useState("");
 
   const mapDivRef       = useRef<HTMLDivElement>(null);
   const mapRef          = useRef<any>(null);
@@ -83,6 +74,7 @@ export default function NaverMapView({
   const userMarker      = useRef<any>(null);
   const placeMarkersRef = useRef<any[]>([]);
   const fetchTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const infoWindowRef   = useRef<any>(null);
 
   // ── 마커 동기화 ────────────────────────────────────────
   function syncMarkers(spots: Hotspot[], selected: Hotspot | null) {
@@ -165,13 +157,30 @@ export default function NaverMapView({
             icon: { content, anchor: new N.Point(0, 1) },
             zIndex: 5,
           });
-          N.Event.addListener(m, "click", () => setSelectedPlace({
-            name: p.name,
-            category: p.category,
-            address: p.address,
-            link: p.link,
-            color: p.color,
-          }));
+
+          N.Event.addListener(m, "click", () => {
+            if (infoWindowRef.current) infoWindowRef.current.close();
+            const url = p.link || `https://map.naver.com/v5/search/${encodeURIComponent(p.name)}`;
+            const iw = new N.InfoWindow({
+              content: `
+                <div style="padding:14px 16px;min-width:180px;max-width:240px;font-family:-apple-system,sans-serif;">
+                  <div style="font-size:11px;color:${p.color};font-weight:700;margin-bottom:5px;">${p.category || "장소"}</div>
+                  <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:4px;">${p.name}</div>
+                  ${p.address ? `<div style="font-size:11px;color:#888;margin-bottom:12px;line-height:1.4;">${p.address}</div>` : ""}
+                  <a href="${url}" target="_blank"
+                    style="display:block;background:${p.color};color:#fff;text-align:center;padding:8px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;">
+                    네이버 지도에서 보기
+                  </a>
+                </div>`,
+              borderWidth: 0,
+              backgroundColor: "transparent",
+              anchorSkew: false,
+              pixelOffset: new N.Point(0, -10),
+            });
+            iw.open(mapRef.current, m);
+            infoWindowRef.current = iw;
+          });
+
           placeMarkersRef.current.push(m);
         });
       } catch { /* 검색 실패 시 무시 */ }
@@ -198,6 +207,11 @@ export default function NaverMapView({
     });
 
     mapRef.current = map;
+
+    // 지도 클릭 시 InfoWindow 닫기
+    N.Event.addListener(map, "click", () => {
+      if (infoWindowRef.current) infoWindowRef.current.close();
+    });
 
     // 지도 이동/줌 후 주변 장소 자동 검색
     N.Event.addListener(map, "idle", () => {
@@ -271,38 +285,6 @@ export default function NaverMapView({
     <div className="absolute inset-0 overflow-hidden">
       {/* 네이버 지도 */}
       <div ref={mapDivRef} className="absolute inset-0" style={{ width: "100%", height: "100%" }} />
-
-      {/* 장소 카드 */}
-      {selectedPlace && (
-        <div className="absolute bottom-28 left-4 z-20 bg-white rounded-2xl shadow-xl p-4 w-64">
-          <div className="flex items-start justify-between mb-2">
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full border"
-              style={{ color: selectedPlace.color, borderColor: selectedPlace.color }}
-            >
-              {selectedPlace.category || "장소"}
-            </span>
-            <button
-              onClick={() => setSelectedPlace(null)}
-              className="text-gray-400 hover:text-gray-600 text-lg leading-none ml-2"
-            >×</button>
-          </div>
-          <p className="font-bold text-gray-900 text-sm mb-1 leading-snug">{selectedPlace.name}</p>
-          {selectedPlace.address && (
-            <p className="text-xs text-gray-400 mb-3 leading-snug">{selectedPlace.address}</p>
-          )}
-          <button
-            onClick={() => window.open(
-              selectedPlace.link || `https://map.naver.com/v5/search/${encodeURIComponent(selectedPlace.name)}`,
-              "_blank"
-            )}
-            className="w-full py-2 rounded-xl text-xs font-bold text-white"
-            style={{ backgroundColor: selectedPlace.color }}
-          >
-            네이버 지도에서 보기
-          </button>
-        </div>
-      )}
 
       {/* 줌 컨트롤 */}
       {status === "ready" && (
