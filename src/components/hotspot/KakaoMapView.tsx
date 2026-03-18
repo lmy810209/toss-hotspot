@@ -52,10 +52,12 @@ export default function NaverMapView({
   const [status, setStatus]     = useState<SDKStatus>("loading");
   const [errorMsg, setErrorMsg] = useState("");
 
-  const mapDivRef   = useRef<HTMLDivElement>(null);
-  const mapRef      = useRef<any>(null);
-  const markersRef  = useRef<Map<string, any>>(new Map());
-  const userMarker  = useRef<any>(null);
+  const mapDivRef       = useRef<HTMLDivElement>(null);
+  const mapRef          = useRef<any>(null);
+  const markersRef      = useRef<Map<string, any>>(new Map());
+  const userMarker      = useRef<any>(null);
+  const placeMarkersRef = useRef<any[]>([]);
+  const fetchTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── 마커 동기화 ────────────────────────────────────────
   function syncMarkers(spots: Hotspot[], selected: Hotspot | null) {
@@ -112,6 +114,43 @@ export default function NaverMapView({
     }
   }
 
+  // ── 주변 장소 마커 ─────────────────────────────────────
+  function clearPlaceMarkers() {
+    placeMarkersRef.current.forEach((m) => m.setMap(null));
+    placeMarkersRef.current = [];
+  }
+
+  function fetchPlaces(lat: number, lng: number) {
+    if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
+    fetchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/places?lat=${lat}&lng=${lng}`);
+        const data = await res.json();
+        if (!data.places || !mapRef.current) return;
+
+        clearPlaceMarkers();
+        const N = window.naver.maps;
+
+        data.places.forEach((p: any) => {
+          const content =
+            `<div onclick="window.open('${p.link || `https://map.naver.com/v5/search/${encodeURIComponent(p.name)}`}','_blank')" ` +
+            `style="display:flex;flex-direction:column;align-items:center;cursor:pointer;">` +
+            `<div style="background:white;border:2px solid ${p.color};border-radius:8px;padding:2px 7px;font-size:10px;font-weight:700;color:${p.color};white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15);max-width:80px;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>` +
+            `<div style="width:7px;height:7px;background:${p.color};border-radius:50%;margin-top:2px;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>` +
+            `</div>`;
+
+          const m = new N.Marker({
+            position: new N.LatLng(p.lat, p.lng),
+            map: mapRef.current,
+            icon: { content, anchor: new N.Point(0, 1) },
+            zIndex: 5,
+          });
+          placeMarkersRef.current.push(m);
+        });
+      } catch { /* 검색 실패 시 무시 */ }
+    }, 1200); // 1.2초 디바운스
+  }
+
   // ── 지도 초기화 ────────────────────────────────────────
   function initMap() {
     if (!mapDivRef.current) return;
@@ -132,6 +171,12 @@ export default function NaverMapView({
     });
 
     mapRef.current = map;
+
+    // 지도 이동/줌 후 주변 장소 자동 검색
+    N.Event.addListener(map, "idle", () => {
+      const c = map.getCenter();
+      fetchPlaces(c.lat(), c.lng());
+    });
 
     // 컨테이너 크기 재계산
     setTimeout(() => { N.Event.trigger(map, "resize"); }, 100);
