@@ -83,8 +83,8 @@ export default function NaverMapView({
       anchor: any; zIndex: number; onClick: () => void;
     }>();
 
-    if (zoom >= 14) {
-      // 줌 14 이상: 개별 마커
+    if (zoom >= 12) {
+      // 줌 12 이상: 개별 마커
       spots.forEach((h) => {
         const isSelected = selected?.id === h.id;
         toShow.set(`s_${h.id}`, {
@@ -96,8 +96,8 @@ export default function NaverMapView({
         });
       });
     } else {
-      // 줌 13 이하: 그리드 클러스터링
-      const gridSize = zoom >= 12 ? 0.03 : zoom >= 10 ? 0.08 : 0.2;
+      // 줌 11 이하: 그리드 클러스터링
+      const gridSize = zoom >= 10 ? 0.1 : zoom >= 8 ? 0.3 : 0.6;
       const cells    = new Map<string, Hotspot[]>();
 
       for (const spot of spots) {
