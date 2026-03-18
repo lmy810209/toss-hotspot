@@ -133,18 +133,6 @@ export default function NaverMapView({
 
     mapRef.current = map;
 
-    // 줌 레벨에 따라 마커 크기 조정
-    N.Event.addListener(map, "zoom_changed", () => {
-      const z = map.getZoom();
-      const scale = z >= 16 ? 1.2 : z >= 14 ? 1.0 : 0.82;
-      overlaysRef.current.forEach((ov) => {
-        const el = ov.getIcon?.()?.content;
-        if (el instanceof HTMLElement) {
-          el.style.transform = `scale(${scale})`;
-        }
-      });
-    });
-
     // 컨테이너 크기 재계산
     setTimeout(() => { N.Event.trigger(map, "resize"); }, 100);
     setStatus("ready");
