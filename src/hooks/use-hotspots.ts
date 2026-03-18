@@ -31,17 +31,37 @@ interface UseHotspotsReturn {
   reportCongestion: (id: string, level: CongestionLevel) => Promise<void>;
 }
 
-// bounds 변경 시 lat 범위가 0.01° 이상 달라질 때만 재쿼리
-const BOUNDS_THRESHOLD = 0.01;
+// bounds 변경 시 lat 범위가 이 값 이상 달라질 때만 Firestore 재쿼리
+const BOUNDS_THRESHOLD = 0.05; // 약 5km
 
 export function useHotspots(category: string = "전체", bounds?: MapBounds): UseHotspotsReturn {
   const [hotspots, setHotspots] = useState<Hotspot[]>(MOCK_HOTSPOTS);
   const [isFirestoreConnected, setIsFirestoreConnected] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  // 이전 bounds 저장 — 미세한 이동 시 재쿼리 방지
-  const prevBoundsRef = useRef<MapBounds | null>(null);
 
-  // 카테고리 변경 시 mock 데이터 즉시 반영 (TossPlace 우선 정렬)
+  // 실제 Firestore 쿼리에 쓸 "확정 bounds" — threshold 넘을 때만 갱신
+  const stableBoundsRef = useRef<MapBounds | null>(null);
+  // 재쿼리 트리거용 카운터 (bounds 객체 참조 대신 숫자로 의존성 관리)
+  const [queryKey, setQueryKey] = useState(0);
+
+  // bounds가 바뀔 때마다 threshold 비교 → 유의미한 이동만 재쿼리
+  useEffect(() => {
+    if (!bounds) return;
+    const prev = stableBoundsRef.current;
+    if (!prev) {
+      stableBoundsRef.current = bounds;
+      setQueryKey((k) => k + 1);
+      return;
+    }
+    const latDiff =
+      Math.abs(bounds.south - prev.south) + Math.abs(bounds.north - prev.north);
+    if (latDiff >= BOUNDS_THRESHOLD) {
+      stableBoundsRef.current = bounds;
+      setQueryKey((k) => k + 1);
+    }
+  }, [bounds]);
+
+  // 카테고리 변경 시 mock 데이터 즉시 반영
   useEffect(() => {
     if (!isFirestoreConnected) {
       const filtered =
@@ -52,52 +72,35 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
     }
   }, [category, isFirestoreConnected]);
 
-  // Firestore 실시간 구독 — 카테고리 또는 지도 bounds 변경 시 재구독
+  // Firestore 실시간 구독 — category 또는 queryKey(유의미한 이동) 변경 시만 재구독
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) return;
 
-    // bounds 미세 변경(< BOUNDS_THRESHOLD°) 시 재쿼리 생략
-    if (bounds && prevBoundsRef.current) {
-      const prev = prevBoundsRef.current;
-      const latDiff = Math.abs(bounds.south - prev.south) + Math.abs(bounds.north - prev.north);
-      if (latDiff < BOUNDS_THRESHOLD) return;
-    }
-    if (bounds) prevBoundsRef.current = bounds;
-
-    // 이전 구독 해제
     unsubscribeRef.current?.();
 
+    const PAD = 0.02; // 화면 경계 밖 약 2km 여유
+    const currentBounds = stableBoundsRef.current;
+
+    let q;
+    if (currentBounds) {
+      // Geo 범위 쿼리: lat만 Firestore에서, lng는 클라이언트 필터
+      q = query(
+        collection(db, "hotspots"),
+        where("lat", ">=", currentBounds.south - PAD),
+        where("lat", "<=", currentBounds.north + PAD),
+        orderBy("lat", "asc")
+      );
+    } else if (category === "전체") {
+      q = query(collection(db, "hotspots"), orderBy("report_count", "desc"));
+    } else {
+      q = query(
+        collection(db, "hotspots"),
+        where("category", "==", category),
+        orderBy("report_count", "desc")
+      );
+    }
+
     try {
-      /**
-       * Geo 필터링: bounds 있으면 lat 범위 쿼리 (Firestore 단일 필드 range)
-       * → lng는 Firestore 쿼리 제한으로 클라이언트에서 필터
-       * → lat 인덱스 자동 생성됨 (단일 필드)
-       *
-       * bounds 없을 때: 기존 카테고리 쿼리 유지
-       */
-      const PAD = 0.02; // 화면 경계에서 약 2km 여유
-      let q;
-
-      if (bounds) {
-        // Geo 범위 쿼리: lat만 Firestore에서, lng는 클라이언트 필터
-        const conditions = [
-          where("lat", ">=", bounds.south - PAD),
-          where("lat", "<=", bounds.north + PAD),
-        ];
-        if (category !== "전체") {
-          // lat range + category 동시 사용 불가 → lat만 쿼리 후 클라이언트 필터
-        }
-        q = query(collection(db, "hotspots"), ...conditions, orderBy("lat", "asc"));
-      } else if (category === "전체") {
-        q = query(collection(db, "hotspots"), orderBy("report_count", "desc"));
-      } else {
-        q = query(
-          collection(db, "hotspots"),
-          where("category", "==", category),
-          orderBy("report_count", "desc")
-        );
-      }
-
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
@@ -128,10 +131,12 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
             };
           });
 
-          // 클라이언트 필터: lng 범위 + 카테고리(bounds 쿼리 시)
-          if (bounds) {
+          // 클라이언트 필터: lng 범위 + 카테고리
+          if (currentBounds) {
             data = data.filter(
-              (h) => h.lng >= bounds.west - PAD && h.lng <= bounds.east + PAD
+              (h) =>
+                h.lng >= currentBounds.west - PAD &&
+                h.lng <= currentBounds.east + PAD
             );
             if (category !== "전체") {
               data = data.filter((h) => h.category === category);
@@ -154,7 +159,7 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
     return () => {
       unsubscribeRef.current?.();
     };
-  }, [category, bounds]);
+  }, [category, queryKey]); // bounds 객체 대신 queryKey 숫자로 의존성 관리
 
   /**
    * 혼잡도 제보: Firestore 낙관적 업데이트 + serverTimestamp
