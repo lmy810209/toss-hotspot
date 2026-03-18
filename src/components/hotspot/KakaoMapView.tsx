@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { Hotspot, UserLocation } from "@/lib/types";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -300,74 +301,89 @@ export default function NaverMapView({
         </div>
       )}
 
-      {/* 장소 카드 (핫스팟 카드와 동일한 바텀시트 스타일) */}
+      {/* 장소 카드 — BottomSheet.tsx와 동일한 fixed 모달 구조 */}
       {selectedPlace && (
-        <div className="absolute inset-x-0 bottom-0 z-30" style={{ pointerEvents: "auto" }}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          onClick={(e) => { if (e.target === e.currentTarget) setSelectedPlace(null); }}
+        >
           {/* 딤 배경 */}
+          <div className="absolute inset-0 bg-black/30" onClick={() => setSelectedPlace(null)} />
+
+          {/* 카드 */}
           <div
-            className="absolute inset-x-0 bottom-0"
-            style={{ top: "-9999px" }}
-            onClick={() => setSelectedPlace(null)}
-          />
-          <div
-            className="relative bg-white rounded-t-3xl shadow-2xl"
-            style={{ paddingBottom: "env(safe-area-inset-bottom, 16px)" }}
+            className="relative w-full max-w-lg bg-white rounded-t-[28px] animate-slide-up"
+            style={{ maxHeight: "92dvh", overflowY: "auto" }}
           >
             {/* 드래그 핸들 */}
             <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+              <div className="w-10 h-1 bg-toss-gray-200 rounded-full" />
             </div>
 
-            <div className="px-5 pt-2 pb-5">
-              {/* 카테고리 배지 */}
-              <div className="flex items-center gap-2 mb-3">
-                <span
-                  className="text-xs font-bold px-3 py-1 rounded-full text-white"
-                  style={{ background: selectedPlace.color }}
-                >
-                  {/카페|커피|디저트/.test(selectedPlace.category) ? "카페"
-                    : /술|바|맥주/.test(selectedPlace.category) ? "술집"
-                    : /쇼핑|마트|편의점/.test(selectedPlace.category) ? "쇼핑"
-                    : /공원|자연|산/.test(selectedPlace.category) ? "공원"
-                    : "맛집"}
-                </span>
-                <span className="text-xs text-gray-400 font-medium">{selectedPlace.category}</span>
+            {/* × 닫기 버튼 */}
+            <button
+              onClick={() => setSelectedPlace(null)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-toss-gray-100 text-toss-gray-500 hover:bg-toss-gray-200 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="px-6 pt-2 pb-8 space-y-5">
+              {/* 헤더 */}
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span
+                    className="inline-block text-xs font-bold px-2.5 py-1 rounded-full text-white"
+                    style={{ background: selectedPlace.color }}
+                  >
+                    {/카페|커피|디저트/.test(selectedPlace.category) ? "카페"
+                      : /술|바|맥주/.test(selectedPlace.category) ? "술집"
+                      : /쇼핑|마트|편의점/.test(selectedPlace.category) ? "쇼핑"
+                      : /공원|자연|산/.test(selectedPlace.category) ? "공원"
+                      : "맛집"}
+                  </span>
+                  <span className="text-xs text-toss-gray-400 font-medium">{selectedPlace.category}</span>
+                </div>
+                <h2 className="text-2xl font-bold text-toss-gray-900 leading-tight">
+                  {selectedPlace.name}
+                </h2>
+                {selectedPlace.address && (
+                  <p className="text-sm text-toss-gray-500 mt-1">{selectedPlace.address}</p>
+                )}
               </div>
 
-              {/* 장소명 */}
-              <h2 className="text-xl font-extrabold text-gray-900 mb-1 leading-tight">
-                {selectedPlace.name}
-              </h2>
-
-              {/* 주소 */}
-              {selectedPlace.address && (
-                <p className="text-sm text-gray-500 mb-4">{selectedPlace.address}</p>
-              )}
-
               {/* 구분선 */}
-              <div className="border-t border-gray-100 mb-4" />
+              <div className="h-px bg-toss-gray-100" />
 
               {/* 액션 버튼 */}
-              <div className="flex gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
-                  className="flex-1 flex flex-col items-center justify-center gap-1 py-3 rounded-2xl border-2 font-bold text-sm"
-                  style={{ borderColor: "#22c55e", color: "#16a34a", background: "#f0fdf4" }}
+                  className="flex items-center gap-2 bg-emerald-50 rounded-2xl px-3 py-3 border border-emerald-200"
                   onClick={() => alert("포인트 적립은 앱에서 가능해요! 🎉")}
                 >
-                  <span className="text-lg">💰</span>
-                  <span className="text-xs font-extrabold">+10원 적립</span>
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                    <span className="text-base">💰</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-toss-gray-900">적립하고</p>
+                    <p className="text-xs font-black text-emerald-600">+10원 받기</p>
+                  </div>
                 </button>
                 <a
                   href={selectedPlace.link || `https://map.naver.com/v5/search/${encodeURIComponent(selectedPlace.name)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-2 flex items-center justify-center gap-2 py-3 px-4 rounded-2xl text-white font-bold text-sm"
-                  style={{ flex: 2, background: selectedPlace.color }}
+                  className="flex items-center gap-2 bg-toss-gray-50 hover:bg-toss-gray-100 rounded-2xl px-3 py-3 border border-toss-gray-200 transition-all"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
-                  </svg>
-                  네이버 지도에서 보기
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-white" style={{ background: selectedPlace.color }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-toss-gray-900">네이버 지도</p>
+                    <p className="text-xs font-black text-toss-gray-500">에서 보기</p>
+                  </div>
                 </a>
               </div>
             </div>
