@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     "X-Naver-Client-Secret": NAVER_CLIENT_SECRET,
   };
 
-  const results = await Promise.allSettled(
+  const rawResults = await Promise.allSettled(
     queries.map((q) =>
       fetch(
         `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(areaName + " " + q)}&display=5&sort=comment`,
@@ -68,10 +68,13 @@ export async function GET(req: NextRequest) {
     )
   );
 
+  // 디버그: 첫 번째 결과의 원시 응답 확인
+  const debugRaw = rawResults[0];
+
   const places: object[] = [];
   const seen = new Set<string>();
 
-  results.forEach((res) => {
+  rawResults.forEach((res) => {
     if (res.status !== "fulfilled") return;
     const items = res.value?.items ?? [];
     items.forEach((item: Record<string, string>) => {
@@ -96,5 +99,9 @@ export async function GET(req: NextRequest) {
     });
   });
 
-  return NextResponse.json({ places, area: areaName });
+  return NextResponse.json({
+    places,
+    area: areaName,
+    _debug: debugRaw,
+  });
 }
