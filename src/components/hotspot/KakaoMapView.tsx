@@ -134,7 +134,7 @@ export default function NaverMapView({
 
   // ── 네이버 지도 SDK 로드 ───────────────────────────────
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "wo2yd54c9d";
+    const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || "1w6j8to1o1";
 
     const timeout = setTimeout(() => {
       setErrorMsg(
