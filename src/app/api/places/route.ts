@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     "User-Agent":            "Mozilla/5.0",
   };
 
-  const rawResults = await Promise.allSettled(
+  const results = await Promise.allSettled(
     queries.map((q) =>
       fetch(
         `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(areaName + " " + q)}&display=5&sort=comment`,
@@ -70,13 +70,10 @@ export async function GET(req: NextRequest) {
     )
   );
 
-  // 디버그: 첫 번째 결과의 원시 응답 확인
-  const debugRaw = rawResults[0];
-
   const places: object[] = [];
   const seen = new Set<string>();
 
-  rawResults.forEach((res) => {
+  results.forEach((res) => {
     if (res.status !== "fulfilled") return;
     const items = res.value?.items ?? [];
     items.forEach((item: Record<string, string>) => {
@@ -101,9 +98,5 @@ export async function GET(req: NextRequest) {
     });
   });
 
-  return NextResponse.json({
-    places,
-    area: areaName,
-    _debug: debugRaw,
-  });
+  return NextResponse.json({ places, area: areaName });
 }
