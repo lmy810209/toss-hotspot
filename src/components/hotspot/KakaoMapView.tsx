@@ -159,18 +159,26 @@ export default function NaverMapView({
           });
 
           N.Event.addListener(m, "click", () => {
+            console.log("[MarkerClick]", p.name, p.category, p.lat, p.lng);
             if (infoWindowRef.current) infoWindowRef.current.close();
             const url = p.link || `https://map.naver.com/v5/search/${encodeURIComponent(p.name)}`;
             const iw = new N.InfoWindow({
               content: `
-                <div style="padding:14px 16px;min-width:180px;max-width:240px;font-family:-apple-system,sans-serif;">
+                <div style="padding:14px 16px;min-width:190px;max-width:250px;font-family:-apple-system,sans-serif;">
                   <div style="font-size:11px;color:${p.color};font-weight:700;margin-bottom:5px;">${p.category || "장소"}</div>
                   <div style="font-size:15px;font-weight:800;color:#111;margin-bottom:4px;">${p.name}</div>
-                  ${p.address ? `<div style="font-size:11px;color:#888;margin-bottom:12px;line-height:1.4;">${p.address}</div>` : ""}
-                  <a href="${url}" target="_blank"
-                    style="display:block;background:${p.color};color:#fff;text-align:center;padding:8px;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;">
-                    네이버 지도에서 보기
-                  </a>
+                  ${p.address ? `<div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.4;">${p.address}</div>` : ""}
+                  <div style="display:flex;gap:7px;margin-bottom:0;">
+                    <div style="flex:1;background:#f0fdf4;border:1.5px solid #22c55e;border-radius:10px;padding:7px 6px;text-align:center;cursor:pointer;"
+                      onclick="alert('포인트 적립은 앱에서 가능해요! 🎉')">
+                      <div style="font-size:16px;">💰</div>
+                      <div style="font-size:10px;font-weight:800;color:#16a34a;margin-top:2px;">+10원 적립</div>
+                    </div>
+                    <a href="${url}" target="_blank"
+                      style="flex:2;display:flex;align-items:center;justify-content:center;background:${p.color};color:#fff;border-radius:10px;font-size:12px;font-weight:700;text-decoration:none;">
+                      네이버 지도에서 보기
+                    </a>
+                  </div>
                 </div>`,
               borderWidth: 0,
               backgroundColor: "transparent",
