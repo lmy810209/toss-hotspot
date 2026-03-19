@@ -44,10 +44,13 @@ function makeMarkerContent(hotspot: Hotspot, isSelected: boolean): string {
   );
 }
 
-// 클러스터: 파란 원 + 흰색 숫자
+// 클러스터: 파란 원 + 흰색 숫자 (개수에 따라 크기 변동)
 function makeClusterContent(count: number): string {
+  const size = count >= 50 ? 56 : count >= 20 ? 52 : count >= 5 ? 44 : 38;
+  const font = count >= 50 ? 16 : count >= 20 ? 15 : count >= 5 ? 14 : 13;
   return (
-    `<div style="background:#3182F6;color:#fff;font-size:15px;font-weight:900;width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(49,130,246,0.55);border:3px solid #fff;cursor:pointer;">${count}</div>`
+    `<div style="background:#3182F6;color:#fff;font-size:${font}px;font-weight:900;width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(49,130,246,0.55);border:3px solid #fff;cursor:pointer;transition:transform 0.15s;"`+
+    ` onmouseenter="this.style.transform='scale(1.15)'" onmouseleave="this.style.transform='scale(1)'">${count}</div>`
   );
 }
 
@@ -85,8 +88,8 @@ export default function NaverMapView({
       anchor: any; zIndex: number; onClick: () => void;
     }>();
 
-    if (zoom >= 12) {
-      // 줌 12 이상: 개별 마커
+    if (zoom >= 17) {
+      // 줌 17 이상: 모든 마커 개별 표시 (최대 줌인)
       spots.forEach((h) => {
         const isSelected = selected?.id === h.id;
         toShow.set(`s_${h.id}`, {
@@ -98,10 +101,21 @@ export default function NaverMapView({
         });
       });
     } else {
-      // 줌 11 이하: 그리드 클러스터링
-      const gridSize = zoom >= 10 ? 0.1 : zoom >= 8 ? 0.3 : 0.6;
-      const cells    = new Map<string, Hotspot[]>();
+      // 줌 16 이하: 공격적 그리드 클러스터링
+      // 줌이 낮을수록 gridSize가 커져 넓은 범위를 묶음
+      const gridSize =
+        zoom >= 15 ? 0.003  :  // ~300m  (동네 레벨)
+        zoom >= 14 ? 0.006  :  // ~600m
+        zoom >= 13 ? 0.012  :  // ~1.2km
+        zoom >= 12 ? 0.025  :  // ~2.5km
+        zoom >= 11 ? 0.05   :  // ~5km
+        zoom >= 10 ? 0.1    :  // ~10km
+        zoom >= 8  ? 0.3    :  // ~30km
+                     0.6;      // ~60km
 
+      const MIN_CLUSTER = 2; // 2개 이상이면 클러스터
+
+      const cells = new Map<string, Hotspot[]>();
       for (const spot of spots) {
         const key = `${Math.floor(spot.lat / gridSize)}_${Math.floor(spot.lng / gridSize)}`;
         if (!cells.has(key)) cells.set(key, []);
@@ -109,28 +123,32 @@ export default function NaverMapView({
       }
 
       cells.forEach((cellSpots, cellKey) => {
-        if (cellSpots.length === 1) {
-          const h          = cellSpots[0];
-          const isSelected = selected?.id === h.id;
-          toShow.set(`s_${h.id}`, {
-            lat: h.lat, lng: h.lng,
-            content: makeMarkerContent(h, isSelected),
-            anchor: new N.Point(0, 1),
-            zIndex: isSelected ? 20 : 10,
-            onClick: () => onSelectHotspot(h),
-          });
+        if (cellSpots.length < MIN_CLUSTER) {
+          // 단독 마커
+          for (const h of cellSpots) {
+            const isSelected = selected?.id === h.id;
+            toShow.set(`s_${h.id}`, {
+              lat: h.lat, lng: h.lng,
+              content: makeMarkerContent(h, isSelected),
+              anchor: new N.Point(0, 1),
+              zIndex: isSelected ? 20 : 10,
+              onClick: () => onSelectHotspot(h),
+            });
+          }
         } else {
-          const lat      = cellSpots.reduce((s, h) => s + h.lat, 0) / cellSpots.length;
-          const lng      = cellSpots.reduce((s, h) => s + h.lng, 0) / cellSpots.length;
-          const newZoom  = Math.min(zoom + 3, 16);
+          // 클러스터
+          const lat = cellSpots.reduce((s, h) => s + h.lat, 0) / cellSpots.length;
+          const lng = cellSpots.reduce((s, h) => s + h.lng, 0) / cellSpots.length;
+          // 클릭 시 해당 영역으로 자연스럽게 줌인
+          const newZoom = Math.min(zoom + 2, 17);
           toShow.set(`c_${cellKey}`, {
             lat, lng,
             content: makeClusterContent(cellSpots.length),
-            anchor: new N.Point(21, 21),
+            anchor: new N.Point(24, 24),
             zIndex: 15,
             onClick: () => {
-              map.setCenter(new N.LatLng(lat, lng));
-              map.setZoom(newZoom);
+              map.panTo(new N.LatLng(lat, lng));
+              setTimeout(() => map.setZoom(newZoom), 200);
             },
           });
         }
