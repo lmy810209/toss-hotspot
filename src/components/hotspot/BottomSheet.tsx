@@ -15,6 +15,7 @@ import {
   Eye,
   ExternalLink,
   Coins,
+  Tag,
 } from "lucide-react";
 import { useViewerCount } from "@/hooks/use-viewer-count";
 
@@ -106,13 +107,13 @@ export default function BottomSheet({
 
   const handleNaverMap = () => {
     if (!hotspot) return;
-    const url = `https://map.naver.com/v5/search/${encodeURIComponent(hotspot.name)}`;
+    const url = hotspot.naverLink || `https://map.naver.com/v5/search/${encodeURIComponent(hotspot.name)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
   const handleShare = async () => {
     if (!hotspot) return;
-    const cfg = CONGESTION_CONFIG[hotspot.congestion_level];
+    const cfg = CONGESTION_CONFIG[displayLevel];
     const text = `${hotspot.name} 지금 ${cfg.label}! 나도 눅업에서 확인해봐 👉`;
     const url = typeof window !== "undefined" ? window.location.href : "";
     try {
@@ -123,35 +124,33 @@ export default function BottomSheet({
         await navigator.clipboard.writeText(`${text} ${url}`);
         setShareFeedback("copied");
       }
-    } catch { /* 공유 취소 — 무시 */ }
+    } catch { /* 공유 취소 */ }
     setTimeout(() => setShareFeedback(""), 2000);
   };
 
   if (!hotspot) return null;
 
-  const cfg = CONGESTION_CONFIG[hotspot.congestion_level];
+  // 혼잡도 로직: 제보 있으면 live, 없으면 base
+  const hasReports = hotspot.report_count > 0;
+  const displayLevel = hasReports
+    ? hotspot.congestion_level
+    : (hotspot.baseCongestion ?? hotspot.congestion_level);
+  const cfg = CONGESTION_CONFIG[displayLevel];
+  const congestionSource = hasReports ? "실시간 제보 기반" : "운영자 기준";
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center"
       onClick={handleBackdropClick}
     >
-      {/* Backdrop */}
-      <div
-        className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${
-          isVisible ? "opacity-100" : "opacity-0"
-        }`}
-      />
+      <div className={`absolute inset-0 bg-black/30 transition-opacity duration-300 ${isVisible ? "opacity-100" : "opacity-0"}`} />
 
-      {/* Sheet */}
       <div
         ref={sheetRef}
-        className={`relative w-full max-w-lg bg-white rounded-t-[28px] overflow-hidden ${
-          isVisible ? "animate-slide-up" : "animate-slide-down"
-        }`}
+        className={`relative w-full max-w-lg bg-white rounded-t-[28px] overflow-hidden ${isVisible ? "animate-slide-up" : "animate-slide-down"}`}
         style={{ maxHeight: "88dvh" }}
       >
-        {/* ── 제보 완료 오버레이 ── */}
+        {/* 제보 완료 오버레이 */}
         {reportSuccess && (
           <div className="absolute inset-0 bg-white flex flex-col items-center justify-center z-20 gap-3">
             <div className="text-6xl animate-bounce">🎉</div>
@@ -160,12 +159,10 @@ export default function BottomSheet({
           </div>
         )}
 
-        {/* Drag Handle — sticky */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
           <div className="w-10 h-1 bg-toss-gray-200 rounded-full" />
         </div>
 
-        {/* 닫기 */}
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-toss-gray-100 text-toss-gray-500 hover:bg-toss-gray-200 transition-colors z-10"
@@ -173,42 +170,77 @@ export default function BottomSheet({
           <X className="w-4 h-4" />
         </button>
 
-        {/* 스크롤 가능한 콘텐츠 */}
         <div className="overflow-y-auto" style={{ maxHeight: "calc(88dvh - 32px)" }}>
           <div className="px-6 pt-2 pb-10 space-y-4">
 
+            {/* ═══ 고정 정보 영역 ═══ */}
+
+            {/* 대표 이미지 */}
+            {hotspot.imageUrl && (
+              <div className="relative -mx-6 -mt-2">
+                <img
+                  src={hotspot.imageUrl}
+                  alt={hotspot.name}
+                  className="w-full h-40 object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-white/80 to-transparent" />
+              </div>
+            )}
+
             {/* 헤더 */}
             <div>
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="inline-block text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
                   {hotspot.category}
                 </span>
                 {hotspot.is_toss_place && (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-primary px-2 py-0.5 rounded-full">
-                    💳 토스 단말기 매장
+                    💳 토스 단말기
                   </span>
                 )}
               </div>
               <h2 className="text-2xl font-bold text-toss-gray-900 leading-tight">
                 {hotspot.name}
               </h2>
-              <div className="flex items-start justify-between gap-2 mt-1">
-                {hotspot.description && (
-                  <p className="text-sm text-toss-gray-500 flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 shrink-0" />
-                    {hotspot.description}
-                  </p>
-                )}
-                {/* 네이버 지도로 보기 */}
-                <button
-                  onClick={handleNaverMap}
-                  className="flex items-center gap-1 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 px-2.5 py-1.5 rounded-xl transition-colors shrink-0"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  네이버 지도
-                </button>
-              </div>
+
+              {/* 주소 */}
+              {(hotspot.address || hotspot.description) && (
+                <p className="text-sm text-toss-gray-500 flex items-center gap-1 mt-1">
+                  <MapPin className="w-3.5 h-3.5 shrink-0" />
+                  {hotspot.address || hotspot.description}
+                </p>
+              )}
+
+              {/* 대표 설명 (주소와 다를 때만) */}
+              {hotspot.address && hotspot.description && (
+                <p className="text-sm text-toss-gray-400 mt-0.5 ml-5">{hotspot.description}</p>
+              )}
             </div>
+
+            {/* 태그 */}
+            {hotspot.tags && hotspot.tags.length > 0 && (
+              <div className="flex gap-1.5 flex-wrap">
+                {hotspot.tags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center gap-1 text-[11px] font-bold text-toss-gray-500 bg-toss-gray-50 border border-toss-gray-200 px-2.5 py-1 rounded-full">
+                    <Tag className="w-2.5 h-2.5" />
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* 네이버 지도 버튼 */}
+            <button
+              onClick={handleNaverMap}
+              className="w-full flex items-center justify-center gap-2 text-sm font-bold text-primary bg-primary/5 hover:bg-primary/10 border border-primary/15 px-4 py-2.5 rounded-2xl transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              네이버 지도로 보기
+            </button>
+
+            <div className="h-px bg-toss-gray-100" />
+
+            {/* ═══ 실시간 정보 영역 ═══ */}
 
             {/* 실시간 조회자 수 */}
             <div className="flex items-center gap-2.5 bg-toss-gray-50 border border-toss-gray-200 rounded-2xl px-4 py-2.5">
@@ -224,7 +256,12 @@ export default function BottomSheet({
 
             {/* 혼잡도 현황 */}
             <div className={`rounded-2xl p-3.5 ${cfg.bg} ${cfg.border} border`}>
-              <p className="text-xs font-semibold text-toss-gray-500 mb-1">현재 혼잡도</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold text-toss-gray-500">현재 혼잡도</p>
+                <span className="text-[10px] font-bold text-toss-gray-400 bg-white/60 px-2 py-0.5 rounded-full">
+                  {congestionSource}
+                </span>
+              </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{cfg.emoji}</span>
@@ -256,9 +293,8 @@ export default function BottomSheet({
 
             <div className="h-px bg-toss-gray-100" />
 
-            {/* CTA 버튼 2개 나란히 */}
+            {/* CTA 버튼 */}
             <div className="grid grid-cols-2 gap-3">
-              {/* 제보하고 10원 받기 */}
               <button
                 onClick={() => reportRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
                 className="flex items-center gap-2 bg-primary/5 hover:bg-primary/10 active:scale-95 rounded-2xl px-3 py-3.5 border border-primary/15 transition-all"
@@ -271,8 +307,6 @@ export default function BottomSheet({
                   <p className="text-xs font-black text-primary">10원 받기</p>
                 </div>
               </button>
-
-              {/* 친구 공유 +10원 */}
               <button
                 onClick={handleShare}
                 className="flex items-center gap-2 bg-toss-gray-50 hover:bg-toss-gray-100 active:scale-95 rounded-2xl px-3 py-3.5 border border-toss-gray-200 transition-all"

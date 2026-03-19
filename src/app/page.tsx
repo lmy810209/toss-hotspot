@@ -119,7 +119,8 @@ export default function Home() {
         const distScore = Math.max(0, 1 - dist / radiusM) * 50;
         const congestionScore = (4 - h.congestion_level) * 15;
         const reportScore = Math.min(h.report_count, 20);
-        return { ...h, dist, score: distScore + congestionScore + reportScore };
+        const priorityBonus = Math.min(h.priorityScore ?? 0, 30); // 운영자 우선순위 0~30
+        return { ...h, dist, score: distScore + congestionScore + reportScore + priorityBonus };
       })
       .filter(Boolean) as (Hotspot & { dist: number; score: number })[];
     return scored.sort((a, b) => b.score - a.score).slice(0, 3);

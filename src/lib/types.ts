@@ -12,8 +12,26 @@ export interface Hotspot {
   description?: string;
   /** 토스플레이스(단말기) 가맹점 여부 */
   is_toss_place?: boolean;
-  /** 실시간 조회자 수 (Firestore viewers 서브컬렉션 count, 클라이언트 계산) */
+  /** 실시간 조회자 수 */
   viewer_count?: number;
+
+  // ── CMS 확장 필드 ──
+  /** 주소 */
+  address?: string;
+  /** 네이버 지도 링크 */
+  naverLink?: string;
+  /** 대표 이미지 URL */
+  imageUrl?: string;
+  /** 태그 (예: 벚꽃명소, 오픈런, 데이트) */
+  tags?: string[];
+  /** 운영자 기준 기본 혼잡도 */
+  baseCongestion?: CongestionLevel;
+  /** 추천 우선순위 점수 */
+  priorityScore?: number;
+  /** 노출 여부 (false면 지도에 안 보임) */
+  isVisible?: boolean;
+  /** 운영자 메모 */
+  adminMemo?: string;
 }
 
 export interface UserLocation {

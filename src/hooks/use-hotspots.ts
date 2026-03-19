@@ -115,21 +115,31 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
           }
 
           setIsFirestoreConnected(true);
-          let data: Hotspot[] = snapshot.docs.map((docSnap) => {
-            const d = docSnap.data();
-            return {
-              id: docSnap.id,
-              name: d.name ?? "",
-              category: d.category ?? "",
-              lat: d.lat ?? 0,
-              lng: d.lng ?? 0,
-              congestion_level: (d.congestion_level ?? 1) as CongestionLevel,
-              last_updated: d.last_updated?.toDate?.() ?? new Date(),
-              report_count: d.report_count ?? 0,
-              description: d.description,
-              is_toss_place: d.is_toss_place ?? false,
-            };
-          });
+          let data: Hotspot[] = snapshot.docs
+            .map((docSnap) => {
+              const d = docSnap.data();
+              return {
+                id: docSnap.id,
+                name: d.name ?? "",
+                category: d.category ?? "",
+                lat: d.lat ?? 0,
+                lng: d.lng ?? 0,
+                congestion_level: (d.congestion_level ?? d.baseCongestion ?? 1) as CongestionLevel,
+                last_updated: d.last_updated?.toDate?.() ?? new Date(),
+                report_count: d.report_count ?? 0,
+                description: d.description,
+                is_toss_place: d.is_toss_place ?? false,
+                address: d.address,
+                naverLink: d.naverLink,
+                imageUrl: d.imageUrl,
+                tags: d.tags ?? [],
+                baseCongestion: (d.baseCongestion ?? d.congestion_level ?? 2) as CongestionLevel,
+                priorityScore: d.priorityScore ?? 0,
+                isVisible: d.isVisible ?? true,
+                adminMemo: d.adminMemo,
+              };
+            })
+            .filter((h) => h.isVisible !== false);
 
           // 클라이언트 필터: lng 범위 + 카테고리
           if (currentBounds) {
