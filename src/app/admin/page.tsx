@@ -12,14 +12,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { CongestionLevel } from "@/lib/types";
-
 const CATEGORIES = ["맛집", "카페", "쇼핑", "공원", "벚꽃", "관광", "팝업"];
-const CONGESTION_OPT = [
-  { value: 1, label: "😊 여유" },
-  { value: 2, label: "😐 보통" },
-  { value: 3, label: "😵 붐빔" },
-];
 
 interface Spot {
   id: string;
@@ -32,8 +25,6 @@ interface Spot {
   naverLink: string;
   imageUrl: string;
   tags: string[];
-  congestion_level: number;
-  baseCongestion: number;
   report_count: number;
   priorityScore: number;
   isVisible: boolean;
@@ -51,7 +42,6 @@ const EMPTY_FORM = {
   naverLink: "",
   imageUrl: "",
   tags: "",
-  baseCongestion: "2",
   priorityScore: "0",
   isVisible: true,
   adminMemo: "",
@@ -94,8 +84,6 @@ export default function AdminPage() {
           naverLink: data.naverLink ?? "",
           imageUrl: data.imageUrl ?? "",
           tags: data.tags ?? [],
-          congestion_level: data.congestion_level ?? 2,
-          baseCongestion: data.baseCongestion ?? data.congestion_level ?? 2,
           report_count: data.report_count ?? 0,
           priorityScore: data.priorityScore ?? 0,
           isVisible: data.isVisible ?? true,
@@ -139,7 +127,6 @@ export default function AdminPage() {
         naverLink: spot.naverLink,
         imageUrl: spot.imageUrl,
         tags: spot.tags.join(", "),
-        baseCongestion: String(spot.baseCongestion),
         priorityScore: String(spot.priorityScore),
         isVisible: spot.isVisible,
         adminMemo: spot.adminMemo,
@@ -173,7 +160,6 @@ export default function AdminPage() {
       naverLink: form.naverLink.trim(),
       imageUrl: form.imageUrl.trim(),
       tags,
-      baseCongestion: parseInt(form.baseCongestion) as CongestionLevel,
       priorityScore: parseInt(form.priorityScore) || 0,
       isVisible: form.isVisible,
       adminMemo: form.adminMemo.trim(),
@@ -184,7 +170,7 @@ export default function AdminPage() {
     if (editingId) {
       await updateDoc(doc(db, "hotspots", editingId), docData);
     } else {
-      docData.congestion_level = parseInt(form.baseCongestion);
+      docData.congestion_level = 2; // 초기값 보통
       docData.report_count = 0;
       docData.is_toss_place = false;
       docData.source = "manual";
@@ -237,8 +223,7 @@ export default function AdminPage() {
         description: getVal(cols, headers.indexOf("description")),
         imageUrl: getVal(cols, headers.indexOf("imageUrl")),
         tags,
-        baseCongestion: parseInt(getVal(cols, headers.indexOf("baseCongestion"))) || 2,
-        congestion_level: parseInt(getVal(cols, headers.indexOf("baseCongestion"))) || 2,
+        congestion_level: 2,
         priorityScore: parseInt(getVal(cols, headers.indexOf("priorityScore"))) || 0,
         isVisible: getVal(cols, headers.indexOf("isVisible")) !== "false",
         adminMemo: "",
@@ -318,12 +303,6 @@ export default function AdminPage() {
                 <label className={labelCls}>카테고리 *</label>
                 <select className={`${inputCls} bg-white`} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                   {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>기본 혼잡도</label>
-                <select className={`${inputCls} bg-white`} value={form.baseCongestion} onChange={(e) => setForm({ ...form, baseCongestion: e.target.value })}>
-                  {CONGESTION_OPT.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
               </div>
               <div>
@@ -430,7 +409,6 @@ export default function AdminPage() {
                   <th className="text-left px-3 py-3 font-bold text-gray-500 w-8">#</th>
                   <th className="text-left px-3 py-3 font-bold text-gray-500">장소명</th>
                   <th className="text-left px-3 py-3 font-bold text-gray-500 w-20">카테고리</th>
-                  <th className="text-left px-3 py-3 font-bold text-gray-500 w-20">기본 혼잡도</th>
                   <th className="text-left px-3 py-3 font-bold text-gray-500 w-16">제보수</th>
                   <th className="text-left px-3 py-3 font-bold text-gray-500 w-14">노출</th>
                   <th className="text-left px-3 py-3 font-bold text-gray-500 w-16">우선순위</th>
@@ -461,16 +439,6 @@ export default function AdminPage() {
                         disabled={saving === s.id}
                       >
                         {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <select
-                        value={s.baseCongestion}
-                        onChange={(e) => updateField(s.id, "baseCongestion", Number(e.target.value))}
-                        className="border border-gray-200 rounded-lg px-1.5 py-1 text-xs font-bold bg-white w-full"
-                        disabled={saving === s.id}
-                      >
-                        {CONGESTION_OPT.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </td>
                     <td className="px-3 py-2.5 text-gray-500 text-xs">{s.report_count}명</td>

@@ -13,6 +13,7 @@ import { useLocation } from "@/hooks/use-location";
 import { useHotspots } from "@/hooks/use-hotspots";
 import { Search, X, RotateCw, MapPin, Crosshair } from "lucide-react";
 import { APP_NAME } from "@/lib/constants";
+import { computeCongestion, formatReportTime, getWalkTime } from "@/lib/congestion";
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState("전체");
@@ -108,7 +109,7 @@ export default function Home() {
   }, [recommendBase, userLocation, mapCenter]);
 
 
-  // 반경 내 TOP 3 추천 (거리 + 혼잡도 + 제보 수 점수화)
+  // 반경 내 TOP 3 추천 (1순위 한산 → 2순위 가까움 → 3순위 최근 제보)
   const topSpots = useMemo(() => {
     if (!recBase) return [];
     const radiusM = radius * 1000;
@@ -116,11 +117,17 @@ export default function Home() {
       .map((h) => {
         const dist = getDistance(recBase.lat, recBase.lng, h.lat, h.lng);
         if (dist > radiusM) return null;
-        const distScore = Math.max(0, 1 - dist / radiusM) * 50;
-        const congestionScore = (4 - h.congestion_level) * 15;
-        const reportScore = Math.min(h.report_count, 20);
-        const priorityBonus = Math.min(h.priorityScore ?? 0, 30); // 운영자 우선순위 0~30
-        return { ...h, dist, score: distScore + congestionScore + reportScore + priorityBonus };
+        const c = h.computed ?? computeCongestion(h.recentReports ?? []);
+        // 한산함 우선 (1순위)
+        const hansanScore = (4 - c.level) * 25; // 한산=75, 보통=50, 붐빔=25
+        // 가까움 (2순위)
+        const distScore = Math.max(0, 1 - dist / radiusM) * 30;
+        // 최근 제보 있음 (3순위) - 데이터 신뢰도
+        const freshness = c.lastReportedAt
+          ? Math.max(0, 1 - (Date.now() - c.lastReportedAt.getTime()) / (30 * 60 * 1000)) * 20
+          : 0;
+        const priorityBonus = Math.min(h.priorityScore ?? 0, 15);
+        return { ...h, dist, computed: c, score: hansanScore + distScore + freshness + priorityBonus };
       })
       .filter(Boolean) as (Hotspot & { dist: number; score: number })[];
     return scored.sort((a, b) => b.score - a.score).slice(0, 3);
@@ -297,17 +304,10 @@ export default function Home() {
           ) : (
             <div className="divide-y divide-toss-gray-50">
               {topSpots.map((spot, i) => {
-                const levelColor = ({ 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" } as Record<number, string>)[spot.congestion_level];
-                const levelText  = ({ 1: "여유", 2: "보통", 3: "붐빔" } as Record<number, string>)[spot.congestion_level];
-                const distText = spot.dist < 1000
-                  ? `${Math.round(spot.dist)}m`
-                  : `${(spot.dist / 1000).toFixed(1)}km`;
-                // 설명 문구 계산
-                const walkLabel = spot.dist <= 800 ? "도보 가능" : spot.dist <= 1500 ? "도보 애매" : "이동 필요";
-                const congLabel = ({ 1: "여유", 2: "보통", 3: "붐빔" } as Record<number, string>)[spot.congestion_level];
-                const now = Date.now();
-                const updatedAt = spot.last_updated instanceof Date ? spot.last_updated.getTime() : new Date(spot.last_updated).getTime();
-                const recentReport = (now - updatedAt) < 30 * 60 * 1000 ? "최근 제보 있음" : "최근 제보 없음";
+                const c = spot.computed ?? computeCongestion(spot.recentReports ?? []);
+                const levelColor = ({ 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" } as Record<number, string>)[c.level];
+                const walkTime = getWalkTime(spot.dist);
+                const lastReport = c.lastReportedAt ? formatReportTime(c.lastReportedAt) + " 제보" : "제보 없음";
                 return (
                   <button
                     key={spot.id}
@@ -315,20 +315,18 @@ export default function Home() {
                     className="w-full text-left px-3.5 py-3 hover:bg-toss-gray-50 active:bg-toss-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-black text-primary w-4 shrink-0">{i + 1}</span>
+                      <span className="text-base shrink-0">{c.emoji}</span>
                       <span className="flex-1 text-[13px] font-bold text-toss-gray-900 truncate">{spot.name}</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: levelColor }}>
-                        {levelText}
+                        {c.level === 1 ? "한산" : c.level === 2 ? "보통" : "붐빔"}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 mt-1 ml-6">
-                      <span className="text-[10px] text-primary font-bold">{distText}</span>
-                      <span className="text-[10px] text-toss-gray-300">·</span>
-                      <span className="text-[10px] text-toss-gray-400">{spot.report_count}명 제보</span>
-                    </div>
-                    <p className="text-[10px] text-toss-gray-400 mt-1 ml-6">
-                      {walkLabel} · {congLabel} · {recentReport}
+                    <p className="text-[11px] text-toss-gray-500 mt-1 ml-7">
+                      {c.label} · {walkTime} · {lastReport}
                     </p>
+                    {c.level === 1 && c.recentCount > 0 && (
+                      <p className="text-[10px] font-bold text-emerald-600 mt-0.5 ml-7">👉 지금 가면 좋음</p>
+                    )}
                   </button>
                 );
               })}

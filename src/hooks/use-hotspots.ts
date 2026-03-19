@@ -5,24 +5,23 @@ import {
   collection,
   doc,
   onSnapshot,
+  addDoc,
   updateDoc,
   serverTimestamp,
   increment,
   query,
   orderBy,
   where,
+  Timestamp,
+  getDocs,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { MOCK_HOTSPOTS } from "@/lib/mock-data";
-import { Hotspot, CongestionLevel, MapBounds } from "@/lib/types";
+import { Hotspot, CongestionLevel, CongestionReport, MapBounds } from "@/lib/types";
+import { computeCongestion } from "@/lib/congestion";
 
-/** 토스플레이스 가맹점을 최상단으로, 나머지는 report_count 내림차순 */
-function sortWithTossPlaceFirst(arr: Hotspot[]): Hotspot[] {
-  return [...arr].sort((a, b) => {
-    if (a.is_toss_place && !b.is_toss_place) return -1;
-    if (!a.is_toss_place && b.is_toss_place) return 1;
-    return b.report_count - a.report_count;
-  });
+function sortByReport(arr: Hotspot[]): Hotspot[] {
+  return [...arr].sort((a, b) => b.report_count - a.report_count);
 }
 
 interface UseHotspotsReturn {
@@ -31,20 +30,17 @@ interface UseHotspotsReturn {
   reportCongestion: (id: string, level: CongestionLevel) => Promise<void>;
 }
 
-// bounds 변경 시 lat 범위가 이 값 이상 달라질 때만 Firestore 재쿼리
-const BOUNDS_THRESHOLD = 0.05; // 약 5km
+const BOUNDS_THRESHOLD = 0.05;
+const REPORT_WINDOW_MS = 30 * 60 * 1000; // 30분
 
 export function useHotspots(category: string = "전체", bounds?: MapBounds): UseHotspotsReturn {
   const [hotspots, setHotspots] = useState<Hotspot[]>(MOCK_HOTSPOTS);
   const [isFirestoreConnected, setIsFirestoreConnected] = useState(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-
-  // 실제 Firestore 쿼리에 쓸 "확정 bounds" — threshold 넘을 때만 갱신
   const stableBoundsRef = useRef<MapBounds | null>(null);
-  // 재쿼리 트리거용 카운터 (bounds 객체 참조 대신 숫자로 의존성 관리)
   const [queryKey, setQueryKey] = useState(0);
+  const reportsCache = useRef<Map<string, CongestionReport[]>>(new Map());
 
-  // bounds가 바뀔 때마다 threshold 비교 → 유의미한 이동만 재쿼리
   useEffect(() => {
     if (!bounds) return;
     const prev = stableBoundsRef.current;
@@ -53,37 +49,76 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
       setQueryKey((k) => k + 1);
       return;
     }
-    const latDiff =
-      Math.abs(bounds.south - prev.south) + Math.abs(bounds.north - prev.north);
+    const latDiff = Math.abs(bounds.south - prev.south) + Math.abs(bounds.north - prev.north);
     if (latDiff >= BOUNDS_THRESHOLD) {
       stableBoundsRef.current = bounds;
       setQueryKey((k) => k + 1);
     }
   }, [bounds]);
 
-  // 카테고리 변경 시 mock 데이터 즉시 반영
   useEffect(() => {
     if (!isFirestoreConnected) {
-      const filtered =
-        category === "전체"
-          ? MOCK_HOTSPOTS
-          : MOCK_HOTSPOTS.filter((h) => h.category === category);
-      setHotspots(sortWithTossPlaceFirst(filtered));
+      const filtered = category === "전체" ? MOCK_HOTSPOTS : MOCK_HOTSPOTS.filter((h) => h.category === category);
+      setHotspots(sortByReport(filtered));
     }
   }, [category, isFirestoreConnected]);
 
-  // Firestore 실시간 구독 — category 또는 queryKey(유의미한 이동) 변경 시만 재구독
+  // 특정 핫스팟의 최근 30분 제보를 가져와 혼잡도 계산
+  const fetchReports = useCallback(async (hotspotId: string): Promise<CongestionReport[]> => {
+    try {
+      const cutoff = Timestamp.fromDate(new Date(Date.now() - REPORT_WINDOW_MS));
+      const q = query(
+        collection(db, "hotspots", hotspotId, "reports"),
+        where("timestamp", ">=", cutoff),
+        orderBy("timestamp", "desc")
+      );
+      const snap = await getDocs(q);
+      const reports: CongestionReport[] = snap.docs.map((d) => ({
+        level: d.data().level as CongestionLevel,
+        timestamp: d.data().timestamp?.toDate() ?? new Date(),
+        sessionId: d.data().sessionId ?? "",
+      }));
+      reportsCache.current.set(hotspotId, reports);
+      return reports;
+    } catch {
+      return reportsCache.current.get(hotspotId) ?? [];
+    }
+  }, []);
+
+  // 핫스팟 리스트에 실시간 혼잡도 붙이기
+  const enrichWithCongestion = useCallback(async (spots: Hotspot[]): Promise<Hotspot[]> => {
+    // 성능: 상위 30개만 제보 조회
+    const toEnrich = spots.slice(0, 30);
+    const results = await Promise.all(
+      toEnrich.map(async (h) => {
+        const reports = await fetchReports(h.id);
+        const computed = computeCongestion(reports);
+        return {
+          ...h,
+          recentReports: reports,
+          computed,
+          congestion_level: computed.recentCount > 0 ? computed.level : h.congestion_level,
+        };
+      })
+    );
+    // 나머지는 기본 computed 없이 반환
+    const remaining = spots.slice(30).map((h) => ({
+      ...h,
+      computed: computeCongestion([]),
+    }));
+    return [...results, ...remaining];
+  }, [fetchReports]);
+
+  // Firestore 실시간 구독
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) return;
-
     unsubscribeRef.current?.();
 
-    const PAD = 0.02; // 화면 경계 밖 약 2km 여유
+    const PAD = 0.02;
     const currentBounds = stableBoundsRef.current;
-
     let q;
+
     if (currentBounds) {
-      // Geo 범위 쿼리: lat만 Firestore에서, lng는 클라이언트 필터
       q = query(
         collection(db, "hotspots"),
         where("lat", ">=", currentBounds.south - PAD),
@@ -103,14 +138,10 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
     try {
       const unsubscribe = onSnapshot(
         q,
-        (snapshot) => {
+        async (snapshot) => {
           if (snapshot.empty) {
             setIsFirestoreConnected(false);
-            setHotspots(
-              category === "전체"
-                ? MOCK_HOTSPOTS
-                : MOCK_HOTSPOTS.filter((h) => h.category === category)
-            );
+            setHotspots(category === "전체" ? MOCK_HOTSPOTS : MOCK_HOTSPOTS.filter((h) => h.category === category));
             return;
           }
 
@@ -124,7 +155,7 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
                 category: d.category ?? "",
                 lat: d.lat ?? 0,
                 lng: d.lng ?? 0,
-                congestion_level: (d.congestion_level ?? d.baseCongestion ?? 1) as CongestionLevel,
+                congestion_level: (d.congestion_level ?? 2) as CongestionLevel,
                 last_updated: d.last_updated?.toDate?.() ?? new Date(),
                 report_count: d.report_count ?? 0,
                 description: d.description,
@@ -133,7 +164,6 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
                 naverLink: d.naverLink,
                 imageUrl: d.imageUrl,
                 tags: d.tags ?? [],
-                baseCongestion: (d.baseCongestion ?? d.congestion_level ?? 2) as CongestionLevel,
                 priorityScore: d.priorityScore ?? 0,
                 isVisible: d.isVisible ?? true,
                 adminMemo: d.adminMemo,
@@ -141,64 +171,88 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
             })
             .filter((h) => h.isVisible !== false);
 
-          // 클라이언트 필터: lng 범위 + 카테고리
           if (currentBounds) {
             data = data.filter(
-              (h) =>
-                h.lng >= currentBounds.west - PAD &&
-                h.lng <= currentBounds.east + PAD
+              (h) => h.lng >= currentBounds.west - PAD && h.lng <= currentBounds.east + PAD
             );
             if (category !== "전체") {
               data = data.filter((h) => h.category === category);
             }
           }
 
-          setHotspots(sortWithTossPlaceFirst(data));
+          // 실시간 제보 데이터로 혼잡도 계산
+          const enriched = await enrichWithCongestion(sortByReport(data));
+          setHotspots(enriched);
         },
         (err) => {
-          console.warn("[useHotspots] Firestore 오류, mock 사용:", err.message);
+          console.warn("[useHotspots] Firestore 오류:", err.message);
           setIsFirestoreConnected(false);
         }
       );
-
       unsubscribeRef.current = unsubscribe;
     } catch (err) {
       console.warn("[useHotspots] Firebase 초기화 오류:", err);
     }
 
-    return () => {
-      unsubscribeRef.current?.();
-    };
-  }, [category, queryKey]); // bounds 객체 대신 queryKey 숫자로 의존성 관리
+    return () => { unsubscribeRef.current?.(); };
+  }, [category, queryKey, enrichWithCongestion]);
 
-  /**
-   * 혼잡도 제보: Firestore 낙관적 업데이트 + serverTimestamp
-   */
+  // 30초마다 혼잡도 갱신 (시간 감쇠 반영)
+  useEffect(() => {
+    if (!isFirestoreConnected) return;
+    const interval = setInterval(async () => {
+      const enriched = await enrichWithCongestion(hotspots);
+      setHotspots(enriched);
+    }, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFirestoreConnected, enrichWithCongestion]);
+
+  // 제보: 서브컬렉션에 기록
   const reportCongestion = useCallback(
     async (id: string, level: CongestionLevel) => {
-      // 낙관적 UI 반영
+      const sessionId = typeof window !== "undefined"
+        ? (sessionStorage.getItem("__nookup_sid__") || (() => {
+            const sid = crypto.randomUUID();
+            sessionStorage.setItem("__nookup_sid__", sid);
+            return sid;
+          })())
+        : "unknown";
+
+      // 낙관적 업데이트
+      const newReport: CongestionReport = { level, timestamp: new Date(), sessionId };
       setHotspots((prev) =>
-        prev.map((spot) =>
-          spot.id === id
-            ? {
-                ...spot,
-                congestion_level: level,
-                report_count: spot.report_count + 1,
-                last_updated: new Date(),
-              }
-            : spot
-        )
+        prev.map((spot) => {
+          if (spot.id !== id) return spot;
+          const reports = [...(spot.recentReports ?? []), newReport];
+          const computed = computeCongestion(reports);
+          return {
+            ...spot,
+            congestion_level: computed.level,
+            report_count: spot.report_count + 1,
+            last_updated: new Date(),
+            recentReports: reports,
+            computed,
+          };
+        })
       );
 
       if (isFirestoreConnected) {
         try {
+          // 서브컬렉션에 제보 기록
+          await addDoc(collection(db, "hotspots", id, "reports"), {
+            level,
+            timestamp: serverTimestamp(),
+            sessionId,
+          });
+          // 부모 문서 카운터 증가
           await updateDoc(doc(db, "hotspots", id), {
-            congestion_level: level,
-            last_updated: serverTimestamp(),
             report_count: increment(1),
+            last_updated: serverTimestamp(),
+            congestion_level: level, // 마지막 제보 기준 (폴백용)
           });
         } catch (err) {
-          console.error("[useHotspots] Firestore 업데이트 실패:", err);
+          console.error("[useHotspots] 제보 저장 실패:", err);
         }
       }
     },

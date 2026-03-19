@@ -1,4 +1,21 @@
-export type CongestionLevel = 1 | 2 | 3; // 1: 여유(Green), 2: 보통(Yellow), 3: 붐빔(Red)
+export type CongestionLevel = 1 | 2 | 3; // 1: 한산(😎), 2: 보통(😐), 3: 붐빔(🔥)
+
+/** 개별 유저 제보 (Firestore: hotspots/{id}/reports) */
+export interface CongestionReport {
+  level: CongestionLevel;
+  timestamp: Date;
+  sessionId: string;
+}
+
+/** 실시간 계산된 혼잡도 */
+export interface ComputedCongestion {
+  level: CongestionLevel;
+  recentCount: number;       // 최근 30분 제보 수
+  last5minCount: number;     // 최근 5분 제보 수
+  lastReportedAt: Date | null;
+  label: string;             // "지금 한산함" 등
+  emoji: string;             // 😎 😐 🔥
+}
 
 export interface Hotspot {
   id: string;
@@ -10,28 +27,21 @@ export interface Hotspot {
   last_updated: Date;
   report_count: number;
   description?: string;
-  /** 토스플레이스(단말기) 가맹점 여부 */
   is_toss_place?: boolean;
-  /** 실시간 조회자 수 */
   viewer_count?: number;
 
-  // ── CMS 확장 필드 ──
-  /** 주소 */
+  // CMS 필드
   address?: string;
-  /** 네이버 지도 링크 */
   naverLink?: string;
-  /** 대표 이미지 URL */
   imageUrl?: string;
-  /** 태그 (예: 벚꽃명소, 오픈런, 데이트) */
   tags?: string[];
-  /** 운영자 기준 기본 혼잡도 */
-  baseCongestion?: CongestionLevel;
-  /** 추천 우선순위 점수 */
   priorityScore?: number;
-  /** 노출 여부 (false면 지도에 안 보임) */
   isVisible?: boolean;
-  /** 운영자 메모 */
   adminMemo?: string;
+
+  // 실시간 제보 데이터 (클라이언트 계산)
+  recentReports?: CongestionReport[];
+  computed?: ComputedCongestion;
 }
 
 export interface UserLocation {
