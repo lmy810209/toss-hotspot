@@ -11,7 +11,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "@/hooks/use-location";
 import { useHotspots } from "@/hooks/use-hotspots";
-import { Search, X } from "lucide-react";
+import { Search, X, RotateCw, MapPin, Crosshair } from "lucide-react";
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState("전체");
@@ -23,6 +23,11 @@ export default function Home() {
   const [showSearch, setShowSearch] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(true); // 초기값 true → 깜빡임 방지
   const [radius, setRadius] = useState<1 | 3 | 5>(3); // km
+  const [recommendBase, setRecommendBase] = useState<
+    { type: "user" } | { type: "map"; lat: number; lng: number }
+  >({ type: "user" });
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [showAreaButton, setShowAreaButton] = useState(false);
 
   const { toast } = useToast();
   const { userLocation, isLoading: locationLoading, refresh: refreshLocation } = useLocation();
@@ -37,6 +42,32 @@ export default function Home() {
     localStorage.setItem("cherry_banner_dismissed", "1");
     setBannerDismissed(true);
   };
+
+  // 거리 계산 (m)
+  const getDistance = useCallback((lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371000;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLng = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }, []);
+
+  // 지도 이동 시 중심 좌표 추적 + "이 지역에서 다시 찾기" 표시
+  const handleBoundsChange = useCallback(
+    (bounds: MapBounds) => {
+      setMapBounds(bounds);
+      const center = { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 };
+      setMapCenter(center);
+
+      const baseLat = recommendBase.type === "user" ? userLocation?.lat : recommendBase.lat;
+      const baseLng = recommendBase.type === "user" ? userLocation?.lng : recommendBase.lng;
+      if (baseLat != null && baseLng != null) {
+        const moved = getDistance(baseLat, baseLng, center.lat, center.lng);
+        setShowAreaButton(moved > 500);
+      }
+    },
+    [recommendBase, userLocation, getDistance]
+  );
 
   const handleReport = useCallback(
     async (id: string, level: 1 | 2 | 3) => {
@@ -56,32 +87,28 @@ export default function Home() {
     setPanToCoords({ lat: spot.lat, lng: spot.lng, key: Date.now() });
   }, []);
 
-  // 거리 계산 (m)
-  const getDistance = useCallback((lat1: number, lng1: number, lat2: number, lng2: number) => {
-    const R = 6371000;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLng = ((lng2 - lng1) * Math.PI) / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }, []);
+  // 추천 기준 좌표
+  const recBase = useMemo(() => {
+    if (recommendBase.type === "map") return { lat: recommendBase.lat, lng: recommendBase.lng };
+    return userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null;
+  }, [recommendBase, userLocation]);
 
   // 반경 내 TOP 3 추천 (거리 + 혼잡도 + 제보 수 점수화)
   const topSpots = useMemo(() => {
-    if (!userLocation) return [];
+    if (!recBase) return [];
     const radiusM = radius * 1000;
     const scored = hotspots
       .map((h) => {
-        const dist = getDistance(userLocation.lat, userLocation.lng, h.lat, h.lng);
+        const dist = getDistance(recBase.lat, recBase.lng, h.lat, h.lng);
         if (dist > radiusM) return null;
-        // 점수: 가까울수록 높음 + 여유(1)>보통(2)>붐빔(3) 가중 + 제보 수 보너스
-        const distScore = Math.max(0, 1 - dist / radiusM) * 50; // 0~50
-        const congestionScore = (4 - h.congestion_level) * 15; // 여유=45, 보통=30, 붐빔=15
-        const reportScore = Math.min(h.report_count, 20); // 0~20
+        const distScore = Math.max(0, 1 - dist / radiusM) * 50;
+        const congestionScore = (4 - h.congestion_level) * 15;
+        const reportScore = Math.min(h.report_count, 20);
         return { ...h, dist, score: distScore + congestionScore + reportScore };
       })
       .filter(Boolean) as (Hotspot & { dist: number; score: number })[];
     return scored.sort((a, b) => b.score - a.score).slice(0, 3);
-  }, [hotspots, userLocation, radius, getDistance]);
+  }, [hotspots, recBase, radius, getDistance]);
 
   return (
     <main className="flex flex-col h-screen w-full bg-background font-body relative overflow-hidden">
@@ -155,20 +182,45 @@ export default function Home() {
         selectedHotspot={selectedHotspot}
         userLocation={userLocation}
         onRefreshLocation={refreshLocation}
-        onBoundsChange={setMapBounds}
+        onBoundsChange={handleBoundsChange}
         panToUserTrigger={panTrigger}
         onPanToUser={() => setPanTrigger((t) => t + 1)}
         panToCoords={panToCoords}
       />
 
+      {/* "이 지역에서 다시 찾기" 플로팅 버튼 — 지도 위 상단 중앙 */}
+      {showAreaButton && mapCenter && (
+        <div className="absolute top-[140px] left-1/2 -translate-x-1/2 z-20">
+          <button
+            onClick={() => {
+              setRecommendBase({ type: "map", lat: mapCenter.lat, lng: mapCenter.lng });
+              setShowAreaButton(false);
+            }}
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full shadow-lg hover:bg-primary/90 active:scale-95 transition-all"
+          >
+            <RotateCw className="w-3.5 h-3.5" />
+            이 지역에서 다시 찾기
+          </button>
+        </div>
+      )}
+
       {/* 지금 갈만한 곳 TOP 3 */}
       <div className="absolute bottom-20 left-4 z-10 pointer-events-none">
         <div className="bg-white/96 backdrop-blur-md rounded-2xl toss-shadow border border-toss-gray-200 pointer-events-auto w-[250px] overflow-hidden">
-          {/* 헤더 + 반경 선택 */}
+          {/* 헤더 + 기준 표시 + 반경 선택 */}
           <div className="px-4 pt-3 pb-2.5 border-b border-toss-gray-100">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shrink-0" />
-              <p className="text-[11px] font-bold text-toss-gray-700">지금 갈만한 곳</p>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shrink-0" />
+                <p className="text-[11px] font-bold text-toss-gray-700">지금 갈만한 곳</p>
+              </div>
+              <span className="flex items-center gap-1 text-[9px] font-bold text-toss-gray-400 bg-toss-gray-50 px-2 py-0.5 rounded-full">
+                {recommendBase.type === "user" ? (
+                  <><Crosshair className="w-2.5 h-2.5" />현재 위치</>
+                ) : (
+                  <><MapPin className="w-2.5 h-2.5" />지도 중심</>
+                )}
+              </span>
             </div>
             <div className="flex gap-1.5">
               {([1, 3, 5] as const).map((r) => (
@@ -188,7 +240,7 @@ export default function Home() {
           </div>
 
           {/* 추천 목록 */}
-          {!userLocation ? (
+          {!recBase ? (
             <div className="px-4 py-4 text-center">
               <p className="text-[11px] text-toss-gray-400">위치 정보가 필요해요</p>
               <p className="text-[10px] text-toss-gray-300 mt-0.5">&apos;내 위치&apos; 버튼을 눌러주세요</p>
@@ -228,6 +280,21 @@ export default function Home() {
                 );
               })}
             </div>
+          )}
+
+          {/* 현위치에서 다시 찾기 버튼 (지도 중심 기준일 때만 표시) */}
+          {recommendBase.type === "map" && userLocation && (
+            <button
+              onClick={() => {
+                setRecommendBase({ type: "user" });
+                setShowAreaButton(false);
+                setPanTrigger((t) => t + 1); // 지도도 현위치로 이동
+              }}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border-t border-toss-gray-100 text-[11px] font-bold text-primary hover:bg-primary/5 active:bg-primary/10 transition-colors"
+            >
+              <Crosshair className="w-3 h-3" />
+              현위치에서 다시 찾기
+            </button>
           )}
         </div>
       </div>
