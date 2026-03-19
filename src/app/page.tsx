@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "@/hooks/use-location";
 import { useHotspots } from "@/hooks/use-hotspots";
 import { Search, X, RotateCw, MapPin, Crosshair } from "lucide-react";
+import { APP_NAME } from "@/lib/constants";
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState("전체");
@@ -131,9 +132,9 @@ export default function Home() {
         <header className="px-4 py-3 flex items-center justify-between">
           <h1 className="text-xl font-bold text-primary flex items-center gap-2.5">
             <span className="w-8 h-8 bg-primary rounded-xl flex items-center justify-center text-white font-black text-xs shadow-sm">
-              T
+              N
             </span>
-            Toss Hotspot
+            {APP_NAME}
           </h1>
 
           <div className="flex items-center gap-2">

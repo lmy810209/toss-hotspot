@@ -1,5 +1,5 @@
 /**
- * Toss Hotspot — 네이버 Local Search API 기반 대량 수집 스크립트
+ * 눅업(nookup) — 네이버 Local Search API 기반 대량 수집 스크립트
  *
  * 실행 방법:
  *   npx tsx --env-file=.env.local scripts/collect-hotspots.ts --region 서울
@@ -269,7 +269,7 @@ async function clearRegion(region: string): Promise<void> {
 
 // ── 메인 ─────────────────────────────────────────────────────────
 async function main() {
-  console.log(`\n🔥  Toss Hotspot 대량 수집 시작`);
+  console.log(`\n🔥  눅업(nookup) 대량 수집 시작`);
   console.log(`   지역: ${REGION}`);
   console.log(`   모드: ${DRY_RUN ? "DRY RUN (저장 안 함)" : "실제 저장"}`);
   console.log(`   키워드: ${SEARCH_KEYWORDS.length}개\n`);

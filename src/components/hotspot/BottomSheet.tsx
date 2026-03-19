@@ -113,11 +113,11 @@ export default function BottomSheet({
   const handleShare = async () => {
     if (!hotspot) return;
     const cfg = CONGESTION_CONFIG[hotspot.congestion_level];
-    const text = `${hotspot.name} 지금 ${cfg.label}! 나도 Toss Hotspot에서 확인해봐 👉`;
+    const text = `${hotspot.name} 지금 ${cfg.label}! 나도 눅업에서 확인해봐 👉`;
     const url = typeof window !== "undefined" ? window.location.href : "";
     try {
       if (navigator.share) {
-        await navigator.share({ title: `Toss Hotspot — ${hotspot.name}`, text, url });
+        await navigator.share({ title: `눅업 — ${hotspot.name}`, text, url });
         setShareFeedback("shared");
       } else {
         await navigator.clipboard.writeText(`${text} ${url}`);

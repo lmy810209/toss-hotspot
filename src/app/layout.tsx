@@ -1,9 +1,10 @@
 import type {Metadata} from 'next';
+import { APP_NAME, APP_TAGLINE, APP_DESCRIPTION } from '@/lib/constants';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Toss Hotspot - 실시간 핫플레이스 혼잡도',
-  description: '지금 가장 핫한 곳의 혼잡도를 실시간으로 확인하고 제보하세요.',
+  title: `${APP_NAME} | ${APP_TAGLINE}`,
+  description: APP_DESCRIPTION,
 };
 
 export default function RootLayout({

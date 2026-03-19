@@ -1,5 +1,5 @@
 /**
- * Toss Hotspot — Firestore 시드 스크립트
+ * 눅업(nookup) — Firestore 시드 스크립트
  *
  * 실행 방법:
  *   npx tsx --env-file=.env.local scripts/seed-hotspots.ts
@@ -159,7 +159,7 @@ const hotspots = [
 
 // ── 실행 ────────────────────────────────────────────────────────
 async function seed() {
-  console.log(`\n🌸  Toss Hotspot 시드 시작 — 총 ${hotspots.length}개 장소\n`);
+  console.log(`\n🌸  눅업(nookup) 시드 시작 — 총 ${hotspots.length}개 장소\n`);
 
   for (const spot of hotspots) {
     const { id, ...data } = spot;
