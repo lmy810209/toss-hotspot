@@ -147,35 +147,52 @@ export default function BottomSheet({ hotspot, userLocation, onClose, onReport }
             )}
 
             {/* ═══ 실시간 혼잡도 (핵심) ═══ */}
-            <div className={`rounded-2xl p-4 ${cfg.bg} ${cfg.border} border`}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-3xl">{cfg.emoji}</span>
-                  <div>
-                    <p className={`text-xl font-black ${cfg.color}`}>{computed.label}</p>
-                    {computed.last5minCount > 0 && (
-                      <p className="text-xs text-toss-gray-500 mt-0.5">
-                        방금 <span className="font-bold">{computed.last5minCount}명</span> 제보
-                      </p>
-                    )}
+            {computed.recentCount > 0 ? (
+              <div className={`rounded-2xl p-4 ${cfg.bg} ${cfg.border} border`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-3xl">{cfg.emoji}</span>
+                    <div>
+                      <p className={`text-xl font-black ${cfg.color}`}>{computed.label}</p>
+                      {computed.last5minCount > 0 ? (
+                        <p className="text-xs text-toss-gray-500 mt-0.5">
+                          방금 <span className="font-bold text-primary">{computed.last5minCount}명</span> 제보
+                        </p>
+                      ) : (
+                        <p className="text-xs text-toss-gray-400 mt-0.5">
+                          {formatReportTime(computed.lastReportedAt!)} 업데이트
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-20">
+                    <div className="h-2.5 bg-white/60 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${cfg.bar} ${cfg.barW} transition-all duration-700`} />
+                    </div>
                   </div>
                 </div>
-                <div className="w-20">
-                  <div className="h-2.5 bg-white/60 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${cfg.bar} ${cfg.barW} transition-all duration-700`} />
+                <p className="text-[11px] text-toss-gray-400 mt-1">
+                  최근 30분 {computed.recentCount}명 제보
+                </p>
+              </div>
+            ) : (
+              /* 제보 없을 때 — 행동 유도형 카드 */
+              <div className="rounded-2xl p-4 bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/15">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🕐</span>
+                  <div>
+                    <p className="text-base font-black text-toss-gray-800">아직 제보 부족</p>
+                    <p className="text-xs text-toss-gray-500 mt-0.5">최근 30분 내 업데이트 없음</p>
                   </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 bg-white/80 rounded-xl px-3 py-2">
+                  <Coins className="w-4 h-4 text-primary shrink-0" />
+                  <p className="text-xs text-toss-gray-700">
+                    지금 방문 중이라면 <span className="font-black text-primary">첫 제보 남기고 10P 받기</span>
+                  </p>
                 </div>
               </div>
-
-              {computed.lastReportedAt && (
-                <p className="text-[11px] text-toss-gray-400 mt-1">
-                  마지막 제보 {formatReportTime(computed.lastReportedAt)} · 최근 30분 {computed.recentCount}명
-                </p>
-              )}
-              {computed.recentCount === 0 && (
-                <p className="text-[11px] text-toss-gray-400 mt-1">아직 제보가 없어요 — 첫 제보를 남겨주세요!</p>
-              )}
-            </div>
+            )}
 
             {/* 실시간 조회자 */}
             <div className="flex items-center gap-2.5 bg-toss-gray-50 border border-toss-gray-200 rounded-2xl px-4 py-2.5">
@@ -257,13 +274,20 @@ export default function BottomSheet({ hotspot, userLocation, onClose, onReport }
               </button>
             </div>
 
-            {/* 제보 유도 (리포트 적을 때) */}
+            {/* 제보 유도 */}
             {computed.recentCount < 3 && (
-              <div className="flex items-center gap-2 bg-primary/5 border border-primary/10 rounded-2xl p-3">
-                <Coins className="w-5 h-5 text-primary shrink-0" />
-                <p className="text-xs text-toss-gray-600">
-                  이 장소 제보가 부족해요! <span className="font-bold text-primary">제보하고 10원 받으세요</span>
-                </p>
+              <div className="flex items-center gap-2.5 bg-gradient-to-r from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-3.5">
+                <span className="text-xl shrink-0">💰</span>
+                <div>
+                  <p className="text-xs font-bold text-amber-800">
+                    {computed.recentCount === 0 ? "첫 제보 시 10P 지급!" : "제보할수록 정확도 UP!"}
+                  </p>
+                  <p className="text-[10px] text-amber-600 mt-0.5">
+                    {computed.recentCount === 0
+                      ? "아직 아무도 제보하지 않았어요"
+                      : `현재 ${computed.recentCount}명 제보 · 더 정확한 정보가 필요해요`}
+                  </p>
+                </div>
               </div>
             )}
 

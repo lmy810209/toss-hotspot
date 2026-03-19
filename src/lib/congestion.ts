@@ -2,11 +2,6 @@ import { CongestionLevel, CongestionReport, ComputedCongestion } from "./types";
 
 /**
  * 실시간 혼잡도 계산 (시간 감쇠 가중 평균)
- *
- * - 최근 5분: 가중치 3x
- * - 5~15분: 가중치 1.5x
- * - 15~30분: 가중치 0.5x
- * - 30분 이상: 무시
  */
 export function computeCongestion(reports: CongestionReport[]): ComputedCongestion {
   const now = Date.now();
@@ -26,8 +21,8 @@ export function computeCongestion(reports: CongestionReport[]): ComputedCongesti
       recentCount: 0,
       last5minCount: 0,
       lastReportedAt: null,
-      label: "정보 없음",
-      emoji: "❓",
+      label: "최근 제보 없음",
+      emoji: "🕐",
     };
   }
 
@@ -70,6 +65,20 @@ const LEVEL_EMOJI: Record<CongestionLevel, string> = {
   3: "🔥",
 };
 
+/** 결론형 한 줄 추천 문구 */
+export function getVerdict(computed: ComputedCongestion): { text: string; color: string } {
+  if (computed.recentCount === 0) {
+    return { text: "제보 대기 중 · 방문하면 첫 제보 남겨주세요", color: "text-toss-gray-400" };
+  }
+  if (computed.level === 1) {
+    return { text: "👉 지금 가기 좋음", color: "text-emerald-600" };
+  }
+  if (computed.level === 2) {
+    return { text: "무난함", color: "text-amber-600" };
+  }
+  return { text: "⚠️ 지금은 피하는 게 좋음", color: "text-red-600" };
+}
+
 /** 상대 시간 포맷 ("방금", "2분 전", "15분 전") */
 export function formatReportTime(date: Date): string {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000);
@@ -80,7 +89,7 @@ export function formatReportTime(date: Date): string {
 
 /** 도보 시간 계산 (4km/h 기준) */
 export function getWalkTime(distM: number): string {
-  const min = Math.ceil(distM / 67); // 67m/min ≈ 4km/h
+  const min = Math.ceil(distM / 67);
   if (min <= 1) return "도보 1분";
   if (min <= 30) return `도보 ${min}분`;
   return `${(distM / 1000).toFixed(1)}km`;

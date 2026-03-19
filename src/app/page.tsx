@@ -13,7 +13,7 @@ import { useLocation } from "@/hooks/use-location";
 import { useHotspots } from "@/hooks/use-hotspots";
 import { Search, X, RotateCw, MapPin, Crosshair } from "lucide-react";
 import { APP_NAME } from "@/lib/constants";
-import { computeCongestion, formatReportTime, getWalkTime } from "@/lib/congestion";
+import { computeCongestion, formatReportTime, getWalkTime, getVerdict } from "@/lib/congestion";
 
 export default function Home() {
   const [activeCategory, setActiveCategory] = useState("전체");
@@ -307,7 +307,8 @@ export default function Home() {
                 const c = spot.computed ?? computeCongestion(spot.recentReports ?? []);
                 const levelColor = ({ 1: "#22c55e", 2: "#f59e0b", 3: "#ef4444" } as Record<number, string>)[c.level];
                 const walkTime = getWalkTime(spot.dist);
-                const lastReport = c.lastReportedAt ? formatReportTime(c.lastReportedAt) + " 제보" : "제보 없음";
+                const lastReport = c.lastReportedAt ? formatReportTime(c.lastReportedAt) + " 업데이트" : "제보 대기 중";
+                const verdict = getVerdict(c);
                 return (
                   <button
                     key={spot.id}
@@ -318,15 +319,13 @@ export default function Home() {
                       <span className="text-base shrink-0">{c.emoji}</span>
                       <span className="flex-1 text-[13px] font-bold text-toss-gray-900 truncate">{spot.name}</span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0" style={{ background: levelColor }}>
-                        {c.level === 1 ? "한산" : c.level === 2 ? "보통" : "붐빔"}
+                        {c.recentCount > 0 ? (c.level === 1 ? "한산" : c.level === 2 ? "보통" : "붐빔") : "대기"}
                       </span>
                     </div>
                     <p className="text-[11px] text-toss-gray-500 mt-1 ml-7">
-                      {c.label} · {walkTime} · {lastReport}
+                      {c.recentCount > 0 ? c.label : "최근 30분 내 업데이트 없음"} · {walkTime} · {lastReport}
                     </p>
-                    {c.level === 1 && c.recentCount > 0 && (
-                      <p className="text-[10px] font-bold text-emerald-600 mt-0.5 ml-7">👉 지금 가면 좋음</p>
-                    )}
+                    <p className={`text-[10px] font-bold mt-0.5 ml-7 ${verdict.color}`}>{verdict.text}</p>
                   </button>
                 );
               })}
