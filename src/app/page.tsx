@@ -220,25 +220,26 @@ export default function Home() {
 
       {/* 지금 갈만한 곳 TOP 3 */}
       <div className="absolute bottom-20 left-4 z-10 pointer-events-none">
-        <div className="bg-white backdrop-blur-md rounded-2xl border border-toss-gray-200 pointer-events-auto w-[260px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.12)]">
+        <div className="bg-white backdrop-blur-md rounded-2xl border border-toss-gray-200 pointer-events-auto w-[265px] overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.12)]">
           {/* 헤더 */}
-          <div className="px-4 pt-3.5 pb-2.5 border-b border-toss-gray-100 bg-gradient-to-r from-primary/5 to-transparent">
-            <p className="text-[13px] font-black text-toss-gray-900 mb-2">지금 갈만한 곳</p>
-            {/* 버튼 2개: 내 위치 / 이 지역 + 반경 */}
-            <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="px-4 pt-3.5 pb-3 border-b border-toss-gray-100 bg-gradient-to-r from-primary/5 to-transparent">
+            <p className="text-[13px] font-black text-toss-gray-900 mb-2.5">지금 갈만한 곳</p>
+
+            {/* 첫 줄: 내 위치 / 이 지역 */}
+            <div className="flex gap-2 mb-2">
               <button
                 onClick={() => {
                   setRecommendBase({ type: "user" });
                   setShowAreaButton(false);
                   setPanTrigger((t) => t + 1);
                 }}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
                   recommendBase.type === "user"
                     ? "bg-primary text-white shadow-sm"
-                    : "bg-toss-gray-100 text-toss-gray-500 hover:bg-toss-gray-200"
+                    : "bg-toss-gray-100 text-toss-gray-400 hover:bg-toss-gray-200"
                 }`}
               >
-                <Crosshair className="w-2.5 h-2.5" />
+                <Crosshair className="w-3 h-3" />
                 내 위치
               </button>
               <button
@@ -248,29 +249,35 @@ export default function Home() {
                     setShowAreaButton(false);
                   }
                 }}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold transition-all ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-bold transition-all ${
                   recommendBase.type !== "user"
                     ? "bg-primary text-white shadow-sm"
-                    : "bg-toss-gray-100 text-toss-gray-500 hover:bg-toss-gray-200"
+                    : "bg-toss-gray-100 text-toss-gray-400 hover:bg-toss-gray-200"
                 }`}
               >
-                <MapPin className="w-2.5 h-2.5" />
+                <MapPin className="w-3 h-3" />
                 이 지역
               </button>
-              <span className="text-[9px] text-toss-gray-300 mx-0.5">|</span>
-              {([1, 3, 5] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRadius(r)}
-                  className={`px-2 py-1 rounded-full text-[10px] font-bold transition-all ${
-                    radius === r
-                      ? "bg-toss-gray-900 text-white"
-                      : "bg-toss-gray-100 text-toss-gray-400 hover:bg-toss-gray-200"
-                  }`}
-                >
-                  {r}km
-                </button>
-              ))}
+            </div>
+
+            {/* 둘째 줄: 반경 선택 */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold text-toss-gray-400 shrink-0">반경</span>
+              <div className="flex gap-1.5 flex-1">
+                {([1, 3, 5] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setRadius(r)}
+                    className={`flex-1 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                      radius === r
+                        ? "bg-toss-gray-900 text-white shadow-sm"
+                        : "bg-toss-gray-100 text-toss-gray-400 hover:bg-toss-gray-200"
+                    }`}
+                  >
+                    {r}km
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -293,13 +300,12 @@ export default function Home() {
                 const distText = spot.dist < 1000
                   ? `${Math.round(spot.dist)}m`
                   : `${(spot.dist / 1000).toFixed(1)}km`;
-                // 추천 이유 태그 계산
-                const tags: string[] = [];
-                if (spot.dist < 500) tags.push("가까움");
-                else if (spot.dist < 1500) tags.push("도보 가능");
-                if (spot.congestion_level === 1) tags.push("한산");
-                else if (spot.congestion_level === 2) tags.push("적당");
-                if (spot.report_count >= 5) tags.push("최근 제보 있음");
+                // 설명 문구 계산
+                const walkLabel = spot.dist <= 800 ? "도보 가능" : spot.dist <= 1500 ? "도보 애매" : "이동 필요";
+                const congLabel = ({ 1: "여유", 2: "보통", 3: "붐빔" } as Record<number, string>)[spot.congestion_level];
+                const now = Date.now();
+                const updatedAt = spot.last_updated instanceof Date ? spot.last_updated.getTime() : new Date(spot.last_updated).getTime();
+                const recentReport = (now - updatedAt) < 30 * 60 * 1000 ? "최근 제보 있음" : "최근 제보 없음";
                 return (
                   <button
                     key={spot.id}
@@ -318,15 +324,9 @@ export default function Home() {
                       <span className="text-[10px] text-toss-gray-300">·</span>
                       <span className="text-[10px] text-toss-gray-400">{spot.report_count}명 제보</span>
                     </div>
-                    {tags.length > 0 && (
-                      <div className="flex gap-1 mt-1.5 ml-6">
-                        {tags.map((tag) => (
-                          <span key={tag} className="text-[9px] font-bold text-toss-gray-400 bg-toss-gray-50 px-1.5 py-0.5 rounded">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <p className="text-[10px] text-toss-gray-400 mt-1 ml-6">
+                      {walkLabel} · {congLabel} · {recentReport}
+                    </p>
                   </button>
                 );
               })}
