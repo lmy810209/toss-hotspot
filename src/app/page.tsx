@@ -203,17 +203,17 @@ export default function Home() {
         panToCoords={panToCoords}
       />
 
-      {/* "이 지역에서 다시 찾기" 플로팅 버튼 — 지도 위 상단 중앙 */}
+      {/* "이 지역에서 다시 찾기" 플로팅 버튼 — 지도 상단 중앙 */}
       {showAreaButton && mapCenter && (
-        <div className="absolute top-[140px] left-1/2 -translate-x-1/2 z-20">
+        <div className="absolute top-[140px] left-1/2 -translate-x-1/2 z-20 animate-in fade-in slide-in-from-top-2 duration-200">
           <button
             onClick={() => {
               setRecommendBase({ type: "map", lat: mapCenter.lat, lng: mapCenter.lng });
               setShowAreaButton(false);
             }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white text-xs font-bold rounded-full shadow-lg hover:bg-primary/90 active:scale-95 transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-primary text-xs font-bold rounded-full shadow-xl border border-primary/20 hover:bg-primary hover:text-white active:scale-95 transition-all"
           >
-            <RotateCw className="w-3.5 h-3.5" />
+            <MapPin className="w-3.5 h-3.5" />
             이 지역에서 다시 찾기
           </button>
         </div>
@@ -222,12 +222,29 @@ export default function Home() {
       {/* 지금 갈만한 곳 TOP 3 */}
       <div className="absolute bottom-20 left-4 z-10 pointer-events-none">
         <div className="bg-white/96 backdrop-blur-md rounded-2xl toss-shadow border border-toss-gray-200 pointer-events-auto w-[250px] overflow-hidden">
+          {/* 현위치에서 다시 찾기 — 상단 배치 */}
+          {recommendBase.type !== "user" && (
+            <button
+              onClick={() => {
+                setRecommendBase({ type: "user" });
+                setShowAreaButton(false);
+                setPanTrigger((t) => t + 1);
+              }}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-primary/5 text-[11px] font-bold text-primary hover:bg-primary/10 active:bg-primary/15 transition-colors border-b border-primary/10"
+            >
+              <Crosshair className="w-3 h-3" />
+              내 위치 기준으로 다시 찾기
+            </button>
+          )}
+
           {/* 헤더 + 기준 표시 + 반경 선택 */}
           <div className="px-4 pt-3 pb-2.5 border-b border-toss-gray-100">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse shrink-0" />
-                <p className="text-[11px] font-bold text-toss-gray-700">지금 갈만한 곳</p>
+                <p className="text-[11px] font-bold text-toss-gray-700">
+                  {recommendBase.type === "user" ? "내 위치 기준 추천" : "지도 중심 기준 추천"}
+                </p>
               </div>
               <span className="flex items-center gap-1 text-[9px] font-bold text-toss-gray-400 bg-toss-gray-50 px-2 py-0.5 rounded-full">
                 {recLabel === "현재 위치" ? (
@@ -295,21 +312,6 @@ export default function Home() {
                 );
               })}
             </div>
-          )}
-
-          {/* 현위치에서 다시 찾기 버튼 (지도 중심 기준일 때 표시) */}
-          {recommendBase.type !== "user" && (
-            <button
-              onClick={() => {
-                setRecommendBase({ type: "user" });
-                setShowAreaButton(false);
-                setPanTrigger((t) => t + 1);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border-t border-toss-gray-100 text-[11px] font-bold text-primary hover:bg-primary/5 active:bg-primary/10 transition-colors"
-            >
-              <Crosshair className="w-3 h-3" />
-              현위치에서 다시 찾기
-            </button>
           )}
         </div>
       </div>
