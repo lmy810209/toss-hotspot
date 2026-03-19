@@ -24,8 +24,8 @@ export default function Home() {
   const [bannerDismissed, setBannerDismissed] = useState(true); // 초기값 true → 깜빡임 방지
   const [radius, setRadius] = useState<1 | 3 | 5>(3); // km
   const [recommendBase, setRecommendBase] = useState<
-    { type: "user" } | { type: "map"; lat: number; lng: number }
-  >({ type: "user" });
+    { type: "user" } | { type: "map"; lat: number; lng: number } | { type: "auto" }
+  >({ type: "auto" });
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [showAreaButton, setShowAreaButton] = useState(false);
 
@@ -59,6 +59,12 @@ export default function Home() {
       const center = { lat: (bounds.north + bounds.south) / 2, lng: (bounds.east + bounds.west) / 2 };
       setMapCenter(center);
 
+      // auto 모드: 지도 이동하면 자동으로 따라가므로 버튼 불필요
+      if (recommendBase.type === "auto") {
+        setShowAreaButton(false);
+        return;
+      }
+      // user/map 모드: 기준 좌표와 비교
       const baseLat = recommendBase.type === "user" ? userLocation?.lat : recommendBase.lat;
       const baseLng = recommendBase.type === "user" ? userLocation?.lng : recommendBase.lng;
       if (baseLat != null && baseLng != null) {
@@ -87,13 +93,20 @@ export default function Home() {
     setPanToCoords({ lat: spot.lat, lng: spot.lng, key: Date.now() });
   }, []);
 
-  // 추천 기준 좌표 (GPS 없으면 지도 중심으로 폴백)
+  // 추천 기준 좌표: auto/map=지도 중심, user=GPS
   const recBase = useMemo(() => {
-    if (recommendBase.type === "map") return { lat: recommendBase.lat, lng: recommendBase.lng };
-    if (userLocation) return { lat: userLocation.lat, lng: userLocation.lng };
+    if (recommendBase.type === "user" && userLocation) {
+      return { lat: userLocation.lat, lng: userLocation.lng };
+    }
+    if (recommendBase.type === "map") {
+      return { lat: recommendBase.lat, lng: recommendBase.lng };
+    }
+    // auto: 지도 중심 기준
     if (mapCenter) return { lat: mapCenter.lat, lng: mapCenter.lng };
     return null;
   }, [recommendBase, userLocation, mapCenter]);
+
+  const recLabel = recommendBase.type === "user" ? "현재 위치" : "지도 중심";
 
   // 반경 내 TOP 3 추천 (거리 + 혼잡도 + 제보 수 점수화)
   const topSpots = useMemo(() => {
@@ -217,12 +230,10 @@ export default function Home() {
                 <p className="text-[11px] font-bold text-toss-gray-700">지금 갈만한 곳</p>
               </div>
               <span className="flex items-center gap-1 text-[9px] font-bold text-toss-gray-400 bg-toss-gray-50 px-2 py-0.5 rounded-full">
-                {recommendBase.type === "map" ? (
-                  <><MapPin className="w-2.5 h-2.5" />지도 중심</>
-                ) : userLocation ? (
-                  <><Crosshair className="w-2.5 h-2.5" />현재 위치</>
+                {recLabel === "현재 위치" ? (
+                  <><Crosshair className="w-2.5 h-2.5" />{recLabel}</>
                 ) : (
-                  <><MapPin className="w-2.5 h-2.5" />지도 중심</>
+                  <><MapPin className="w-2.5 h-2.5" />{recLabel}</>
                 )}
               </span>
             </div>
@@ -286,13 +297,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* 현위치에서 다시 찾기 버튼 (지도 중심 기준일 때만 표시) */}
-          {recommendBase.type === "map" && userLocation && (
+          {/* 현위치에서 다시 찾기 버튼 (지도 중심 기준일 때 표시) */}
+          {recommendBase.type !== "user" && (
             <button
               onClick={() => {
                 setRecommendBase({ type: "user" });
                 setShowAreaButton(false);
-                setPanTrigger((t) => t + 1); // 지도도 현위치로 이동
+                setPanTrigger((t) => t + 1);
               }}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border-t border-toss-gray-100 text-[11px] font-bold text-primary hover:bg-primary/5 active:bg-primary/10 transition-colors"
             >
