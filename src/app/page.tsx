@@ -87,11 +87,13 @@ export default function Home() {
     setPanToCoords({ lat: spot.lat, lng: spot.lng, key: Date.now() });
   }, []);
 
-  // 추천 기준 좌표
+  // 추천 기준 좌표 (GPS 없으면 지도 중심으로 폴백)
   const recBase = useMemo(() => {
     if (recommendBase.type === "map") return { lat: recommendBase.lat, lng: recommendBase.lng };
-    return userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : null;
-  }, [recommendBase, userLocation]);
+    if (userLocation) return { lat: userLocation.lat, lng: userLocation.lng };
+    if (mapCenter) return { lat: mapCenter.lat, lng: mapCenter.lng };
+    return null;
+  }, [recommendBase, userLocation, mapCenter]);
 
   // 반경 내 TOP 3 추천 (거리 + 혼잡도 + 제보 수 점수화)
   const topSpots = useMemo(() => {
@@ -215,7 +217,9 @@ export default function Home() {
                 <p className="text-[11px] font-bold text-toss-gray-700">지금 갈만한 곳</p>
               </div>
               <span className="flex items-center gap-1 text-[9px] font-bold text-toss-gray-400 bg-toss-gray-50 px-2 py-0.5 rounded-full">
-                {recommendBase.type === "user" ? (
+                {recommendBase.type === "map" ? (
+                  <><MapPin className="w-2.5 h-2.5" />지도 중심</>
+                ) : userLocation ? (
                   <><Crosshair className="w-2.5 h-2.5" />현재 위치</>
                 ) : (
                   <><MapPin className="w-2.5 h-2.5" />지도 중심</>
