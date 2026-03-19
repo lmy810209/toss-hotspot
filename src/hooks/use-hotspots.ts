@@ -114,8 +114,10 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
     if (!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID) return;
     unsubscribeRef.current?.();
 
-    const PAD = 0.02;
     const currentBounds = stableBoundsRef.current;
+    // bounds 내 결과가 적을 수 있으므로 넓게 가져옴 (최소 ±0.05 ≈ 5km)
+    const latSpan = currentBounds ? currentBounds.north - currentBounds.south : 0;
+    const PAD = Math.max(0.05, latSpan * 0.3); // 최소 5km 확장
     let q;
 
     if (currentBounds) {
@@ -165,8 +167,12 @@ export function useHotspots(category: string = "전체", bounds?: MapBounds): Us
                 imageUrl: d.imageUrl,
                 tags: d.tags ?? [],
                 priorityScore: d.priorityScore ?? 0,
+                popularityScore: d.popularityScore ?? 0,
                 isVisible: d.isVisible ?? true,
                 adminMemo: d.adminMemo,
+                sourceCategory: d.sourceCategory ?? "",
+                source: d.source ?? "",
+                region: d.region ?? "",
               };
             })
             .filter((h) => h.isVisible !== false);

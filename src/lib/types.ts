@@ -36,8 +36,14 @@ export interface Hotspot {
   imageUrl?: string;
   tags?: string[];
   priorityScore?: number;
+  popularityScore?: number;
   isVisible?: boolean;
   adminMemo?: string;
+
+  // 수집 메타
+  sourceCategory?: string; // 네이버 원본 카테고리
+  source?: string;         // "naver_api" | "admin" | "seed"
+  region?: string;         // 수집 기준 지역명
 
   // 실시간 제보 데이터 (클라이언트 계산)
   recentReports?: CongestionReport[];

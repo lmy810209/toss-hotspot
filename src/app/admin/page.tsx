@@ -32,6 +32,8 @@ interface Spot {
   isVisible: boolean;
   adminMemo: string;
   region: string;
+  source: string;
+  sourceCategory: string;
 }
 
 const EMPTY_FORM = {
@@ -92,6 +94,8 @@ export default function AdminPage() {
           isVisible: data.isVisible ?? true,
           adminMemo: data.adminMemo ?? "",
           region: data.region ?? "",
+          source: data.source ?? "",
+          sourceCategory: data.sourceCategory ?? "",
         };
       })
     );
@@ -318,19 +322,53 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* 제보 TOP 5 */}
-        {spots.filter((s) => s.report_count > 0).length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-100 p-4 mb-5 shadow-sm">
-            <p className="text-xs font-black text-gray-700 mb-2">🔥 제보 상위 TOP 5</p>
-            <div className="flex gap-2 flex-wrap">
-              {[...spots].sort((a, b) => b.report_count - a.report_count).slice(0, 5).map((s) => (
-                <span key={s.id} className="text-[11px] bg-blue-50 text-blue-700 font-bold px-2.5 py-1 rounded-full">
-                  {s.name} ({s.report_count})
-                </span>
+        {/* 제보 TOP 5 + source/sourceCategory 통계 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+          {spots.filter((s) => s.report_count > 0).length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <p className="text-xs font-black text-gray-700 mb-2">🔥 제보 상위 TOP 5</p>
+              <div className="flex flex-col gap-1">
+                {[...spots].sort((a, b) => b.report_count - a.report_count).slice(0, 5).map((s) => (
+                  <span key={s.id} className="text-[11px] bg-blue-50 text-blue-700 font-bold px-2 py-1 rounded-lg">
+                    {s.name} ({s.report_count})
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs font-black text-gray-700 mb-2">📦 source별</p>
+            <div className="flex flex-col gap-1">
+              {Object.entries(
+                spots.reduce((acc, s) => { acc[s.source || "unknown"] = (acc[s.source || "unknown"] || 0) + 1; return acc; }, {} as Record<string, number>)
+              ).sort((a, b) => b[1] - a[1]).map(([src, cnt]) => (
+                <div key={src} className="flex justify-between text-[11px]">
+                  <span className="text-gray-600">{src}</span>
+                  <span className="font-bold text-gray-900">{cnt}개</span>
+                </div>
               ))}
             </div>
           </div>
-        )}
+
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <p className="text-xs font-black text-gray-700 mb-2">🏷️ 네이버 카테고리별 (상위 10)</p>
+            <div className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+              {Object.entries(
+                spots.reduce((acc, s) => {
+                  const cat = s.sourceCategory || "(없음)";
+                  acc[cat] = (acc[cat] || 0) + 1;
+                  return acc;
+                }, {} as Record<string, number>)
+              ).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([cat, cnt]) => (
+                <div key={cat} className="flex justify-between text-[11px]">
+                  <span className="text-gray-600 truncate mr-2">{cat}</span>
+                  <span className="font-bold text-gray-900 shrink-0">{cnt}개</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
         {/* ── 추가/수정 폼 ── */}
         {showForm && (
